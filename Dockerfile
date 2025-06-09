@@ -24,7 +24,7 @@ RUN useradd -m -s /bin/bash playground && \
 
 # Set up a working directory
 WORKDIR /home/playground
-RUN chown playground:lavik /home/playground
+RUN chown playground:playground /home/playground
 
 # Switch to non-root user
 USER playground

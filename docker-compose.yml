@@ -1,0 +1,59 @@
+services:
+  playground:
+    build: .
+    container_name: isolated-playground
+    stdin_open: true
+    tty: true
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Named volume (managed by Docker)
+      # - data:/home/playground
+      
+      # Bind mount to local directory
+      - ./data:/home/playground
+      
+      # Temporary filesystem for /tmp
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 100M
+    networks:
+      - playground-net
+    # Resource limits for safety
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Remove capabilities
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    # Read-only root filesystem (optional - uncomment if you want extra isolation)
+    # read_only: true
+    # tmpfs:
+    #   - /tmp
+    #   - /var/tmp
+
+networks:
+  playground-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+# Define named volumes
+volumes:
+  playground-data:
+    driver: local
+  playground-projects:
+    driver: local
