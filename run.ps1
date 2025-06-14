@@ -1,52 +1,43 @@
-
 Write-Host "" -ForegroundColor White
-Write-Host " Docker playground quickstart " -ForegroundColor Green
+Write-Host " Docker playground" -ForegroundColor Green
 Write-Host "" -ForegroundColor White
 
-$action = $args[0]
+$language = $args[0]
+$action = $args[1]
 
 switch ($action) {
     "build" {
         Write-Host "Building image..." -ForegroundColor Yellow
-        docker-compose build
+        Write-Host "" -ForegroundColor White
+        docker-compose -f "$language/docker-compose.yml" build
     }
     "start" {
         Write-Host "Starting container..." -ForegroundColor Yellow
-        docker-compose up -d
+        docker-compose -f "$language/docker-compose.yml" up -d
     }
     "shell" {
         Write-Host "Entering container..." -ForegroundColor Yellow
-        docker-compose exec playground /bin/bash
+        docker-compose -f "$language/docker-compose.yml" exec $language /bin/bash
     }
     "stop" {
         Write-Host "Stopping container..." -ForegroundColor Yellow
-        docker-compose down
+        docker-compose -f "$language/docker-compose.yml" down
     }
     "clean" {
         Write-Host "Cleaning up..." -ForegroundColor Yellow
-        docker-compose down -v --rmi all
+        docker-compose -f "$language/docker-compose.yml" down -v --rmi all
     }
     "logs" {
-        docker-compose logs -f playground
-    }
-    "backup" {
-        Write-Host "Backing up volume..." -ForegroundColor Yellow
-        docker run --rm -v docker-playground_playground-data:/data -v ${PWD}:/backup ubuntu tar czf /backup/playground-backup.tar.gz -C /data .
-    }
-    "restore" {
-        Write-Host "Restoring from backup..." -ForegroundColor Yellow
-        docker run --rm -v docker-playground_playground-data:/data -v ${PWD}:/backup ubuntu tar xzf /backup/playground-backup.tar.gz -C /data
+        docker-compose -f "$language/docker-compose.yml" logs
     }
     default {
-        Write-Host "   Commands:" -ForegroundColor Yellow
-        Write-Host "     .\run.ps1 build" -ForegroundColor White
-        Write-Host "     .\run.ps1 start" -ForegroundColor White  
-        Write-Host "     .\run.ps1 shell" -ForegroundColor White
-        Write-Host "     .\run.ps1 stop" -ForegroundColor White  
-        Write-Host "     .\run.ps1 clean" -ForegroundColor White  
-        Write-Host "     .\run.ps1 logs" -ForegroundColor White  
-        Write-Host "     .\run.ps1 backup" -ForegroundColor White
-        Write-Host "     .\run.ps1 restore" -ForegroundColor White
+        Write-Host " Commands:" -ForegroundColor Yellow
+        Write-Host "   .\run.ps1 <language> build" -ForegroundColor White
+        Write-Host "   .\run.ps1 <language> start" -ForegroundColor White  
+        Write-Host "   .\run.ps1 <language> shell" -ForegroundColor White
+        Write-Host "   .\run.ps1 <language> stop" -ForegroundColor White  
+        Write-Host "   .\run.ps1 <language> clean" -ForegroundColor White  
+        Write-Host "   .\run.ps1 <language> logs" -ForegroundColor White
         Write-Host "" -ForegroundColor White
     }
 }

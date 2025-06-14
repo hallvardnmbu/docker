@@ -1,7 +1,7 @@
 services:
-  playground:
+  python:
     build: .
-    container_name: isolated-playground
+    container_name: playground-python
     stdin_open: true
     tty: true
     ports:
@@ -12,6 +12,7 @@ services:
       
       # Bind mount to local directory
       - ./data:/home/playground
+      - ../../snublejuice:/home/snublejuice
       
       # Temporary filesystem for /tmp
       - type: tmpfs
