@@ -18,13 +18,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for safety (password: lavik)
-RUN useradd -m -s /bin/bash playground && \
+RUN useradd -m -d /home -s /bin/bash playground && \
     echo "playground:lavik" | chpasswd && \
     usermod -aG sudo playground
 
 # Set up a working directory
-WORKDIR /home/playground
-RUN chown playground:playground /home/playground
+WORKDIR /home
+RUN chown playground:playground /home
 
 # Switch to non-root user
 USER playground

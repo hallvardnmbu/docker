@@ -8,10 +8,10 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       # Named volume (managed by Docker)
-      # - data:/home/playground
+      # - data:/home/data
       
       # Bind mount to local directory
-      - ./data:/home/playground
+      - ./data:/home/data
       
       # Temporary filesystem for /tmp
       - type: tmpfs
