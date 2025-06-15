@@ -5,7 +5,7 @@ services:
     stdin_open: true
     tty: true
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:3000:3000"
     volumes:
       # Named volume (managed by Docker)
       # - data:/home/data
@@ -13,7 +13,8 @@ services:
       # Bind mount to local directory
       - ./data:/home/data
       - ../../snublejuice:/home/snublejuice
-      
+      - ../../ord:/home/ord
+
       # Temporary filesystem for /tmp
       - type: tmpfs
         target: /tmp
@@ -50,7 +51,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.25.0.0/16
+        - subnet: 172.26.0.0/16
 
 # Define named volumes
 volumes:

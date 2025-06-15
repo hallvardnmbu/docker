@@ -1,7 +1,7 @@
 services:
-  rust:
+  pyjs:
     build: .
-    container_name: playground-rust
+    container_name: playground-pyjs
     stdin_open: true
     tty: true
     ports:
@@ -12,7 +12,9 @@ services:
       
       # Bind mount to local directory
       - ./data:/home/data
-      
+      - ../../snublejuice:/home/snublejuice
+      - ../../ord:/home/ord
+
       # Temporary filesystem for /tmp
       - type: tmpfs
         target: /tmp
@@ -38,13 +40,18 @@ services:
       - FOWNER
       - SETGID
       - SETUID
+    # Read-only root filesystem (optional - uncomment if you want extra isolation)
+    # read_only: true
+    # tmpfs:
+    #   - /tmp
+    #   - /var/tmp
 
 networks:
   playground-net:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.27.0.0/16
+        - subnet: 172.26.0.0/16
 
 # Define named volumes
 volumes:
