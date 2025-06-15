@@ -1,3 +1,6 @@
 **/.Dockerfile.*
 **/Dockerfile~
 **/data/
+
+**/target/
+**/Cargo.lock
