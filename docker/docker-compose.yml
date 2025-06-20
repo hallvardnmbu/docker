@@ -1,16 +1,23 @@
 services:
   torrenting:
     build: .
-    container_name: playground-torrenting
-    privileged: true
+    container_name: playground-torrenting-vpn
+    privileged: true  # Required for VPN and iptables
     stdin_open: true
     tty: true
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8080:8080"  # qBittorrent Web UI
     volumes:
+      # Downloads directory
       - ./data/downloads:/home/downloads
+      
+      # qBittorrent configuration
       - ./data/config:/home/config
+      
+      # NordVPN configuration (you need to add these files)
       - ./data/vpn:/etc/openvpn/nordvpn
+      
+      # Temporary filesystem for /tmp
       - type: tmpfs
         target: /tmp
         tmpfs:
@@ -18,17 +25,28 @@ services:
     networks:
       - torrenting-net
     environment:
+      # Set timezone
       - TZ=UTC
+      # qBittorrent settings
+      - WEBUI_PORT=8080
+    # Resource limits for safety
     deploy:
       resources:
         limits:
           memory: 1G
           cpus: '1.0'
+    # DNS settings (will be overridden by VPN)
     dns:
       - 1.1.1.1
       - 8.8.8.8
+    # Capabilities needed for VPN
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    # Remove unnecessary capabilities
     cap_drop:
       - ALL
+    # Add back only what we need
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -37,7 +55,9 @@ services:
       - FOWNER
       - SETGID
       - SETUID
+    # Restart policy
     restart: unless-stopped
+    # Health check to ensure VPN is working
     healthcheck:
       test: ["CMD", "curl", "-f", "--max-time", "10", "http://ifconfig.me"]
       interval: 5m
@@ -52,6 +72,7 @@ networks:
       config:
         - subnet: 172.27.0.0/16
 
+# Define named volumes
 volumes:
   torrenting-downloads:
     driver: local

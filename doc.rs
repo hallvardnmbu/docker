@@ -41,6 +41,8 @@ enum Commands {
     Logs { language: String, #[arg(trailing_var_arg = true)] extra: Vec<String> },
     /// Setup the project root path
     Setup,
+    /// Setup NordVPN credentials for torrenting
+    VpnSetup,
 }
 
 fn main() {
@@ -48,6 +50,10 @@ fn main() {
     match &cli.command {
         Commands::Setup => {
             setup_config();
+            return;
+        }
+        Commands::VpnSetup => {
+            setup_vpn_config(&resolve_root(cli.root.as_ref()));
             return;
         }
         _ => {}
@@ -86,6 +92,7 @@ fn main() {
         },
         Commands::Logs { language, extra } => run_compose(&root, cli.service.as_deref().unwrap_or(language), language, "logs", extra),
         Commands::Setup => unreachable!(),
+        Commands::VpnSetup => unreachable!(),
     }
 }
 
@@ -128,6 +135,69 @@ fn setup_config() {
     } else {
         eprintln!("\x1b[31mError:\x1b[0m Could not determine home directory.");
         std::process::exit(1);
+    }
+}
+
+fn setup_vpn_config(root: &PathBuf) {
+    let vpn_dir = root.join("torrenting").join("data").join("vpn");
+    
+    // Create directory if it doesn't exist
+    if let Err(e) = fs::create_dir_all(&vpn_dir) {
+        eprintln!("\x1b[31mError:\x1b[0m Failed to create VPN directory: {}", e);
+        std::process::exit(1);
+    }
+    
+    let auth_file = vpn_dir.join("auth.txt");
+    let ovpn_file = vpn_dir.join("nordvpn.ovpn");
+    
+    // Check if OpenVPN config exists
+    if !ovpn_file.exists() {
+        println!("NordVPN OpenVPN configuration not found.");
+        println!("Download your .ovpn file from: https://my.nordaccount.com/dashboard/nordvpn/");
+        println!("Place it at: {}", ovpn_file.display());
+        println!();
+    }
+    
+    // Setup auth file
+    println!("Setting up NordVPN credentials...");
+    println!("Enter your NordVPN service credentials (NOT your account login):");
+    
+    print!("Username: ");
+    io::stdout().flush().unwrap();
+    let mut username = String::new();
+    io::stdin().read_line(&mut username).unwrap();
+    let username = username.trim();
+    
+    print!("Password: ");
+    io::stdout().flush().unwrap();
+    let mut password = String::new();
+    io::stdin().read_line(&mut password).unwrap();
+    let password = password.trim();
+    
+    let auth_content = format!("{}\n{}\n", username, password);
+    
+    if let Err(e) = fs::write(&auth_file, auth_content) {
+        eprintln!("\x1b[31mError:\x1b[0m Failed to write auth file: {}", e);
+        std::process::exit(1);
+    }
+    
+    // Set secure permissions on auth file
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&auth_file).unwrap().permissions();
+        perms.set_mode(0o600);
+        fs::set_permissions(&auth_file, perms).unwrap();
+    }
+    
+    println!("Credentials saved to: {}", auth_file.display());
+    
+    if ovpn_file.exists() {
+        println!("Setup complete! You can now start the torrenting container with:");
+        println!("  doc start torrenting");
+    } else {
+        println!("Setup incomplete. Please place your NordVPN .ovpn file at:");
+        println!("  {}", ovpn_file.display());
     }
 }
 
