@@ -8,7 +8,7 @@ services:
     ports:
       - "127.0.0.1:8081:8081"
     volumes:
-      - E:\:/home/downloads
+      - E:/:/home/downloads
       - ./data/config:/home/config
       - ./data/vpn:/etc/openvpn/nordvpn
       - type: tmpfs
@@ -22,11 +22,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '1.0'
+          memory: 4G
+          cpus: '4.0'
     dns:
       - 1.1.1.1
       - 8.8.8.8
+    dns_search: []
     cap_drop:
       - ALL
     cap_add:
@@ -39,7 +40,7 @@ services:
       - SETUID
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "--max-time", "10", "http://ifconfig.me"]
+      test: ["CMD", "curl", "-f", "--max-time", "10", "http://34.160.111.145", "-H", "Host: ifconfig.me"]
       interval: 5m
       timeout: 10s
       retries: 3

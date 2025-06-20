@@ -42,7 +42,7 @@ if [ "$EUID" -eq 0 ]; then
     done
     
     # Check external IP
-    EXTERNAL_IP=$(curl -s --max-time 10 ifconfig.me || echo "Could not determine IP")
+    EXTERNAL_IP=$(curl -s --max-time 10 http://34.160.111.145 -H "Host: ifconfig.me" || echo "Could not determine IP")
     echo "External IP: $EXTERNAL_IP"
     
     # Create qBittorrent config directory with proper ownership
