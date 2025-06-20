@@ -39,14 +39,7 @@ services:
     dns:
       - 1.1.1.1
       - 8.8.8.8
-    # Capabilities needed for VPN
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    # Remove unnecessary capabilities
-    cap_drop:
-      - ALL
-    # Add back only what we need
+    # Capabilities needed for VPN and container operations
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
