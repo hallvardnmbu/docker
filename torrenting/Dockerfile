@@ -20,10 +20,10 @@ COPY scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
 COPY scripts/killswitch.sh /usr/local/bin/killswitch.sh
 RUN chmod +x /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh
 
-USER playground
-RUN echo 'export PS1="\[\033[01;32m\]torrent@vpn\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "' >> ~/.bashrc
-
-USER root
+# Create .bashrc for playground user and set custom prompt
+RUN touch /home/.bashrc && \
+    chown playground:playground /home/.bashrc && \
+    echo 'export PS1="\[\033[01;32m\]torrent@vpn\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "' >> /home/.bashrc
 
 EXPOSE 8080
 

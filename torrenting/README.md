@@ -22,7 +22,7 @@ Start the container:
 doc start torrenting
 ```
 
-Access qBittorrent Web UI at `http://localhost:8080`
+Access qBittorrent Web UI at `http://localhost:8081`
 - Default credentials: admin / adminadmin
 - Change the password immediately
 
@@ -50,7 +50,7 @@ The IPs should be different.
 
 Container won't start: Verify NordVPN files are correctly placed and credentials are valid.
 
-Can't access Web UI: Ensure container is running and port 8080 is not in use.
+Can't access Web UI: Ensure container is running and port 8081 is not in use.
 
 No internet in container: This is normal - the kill switch blocks non-VPN traffic. Check VPN connection in logs.
 

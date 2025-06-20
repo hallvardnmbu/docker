@@ -41,7 +41,7 @@ enum Commands {
     Logs { language: String, #[arg(trailing_var_arg = true)] extra: Vec<String> },
     /// Setup the project root path
     Setup,
-    /// Setup NordVPN credentials for torrenting
+    /// Setup NordVPN OpenVPN config and service credentials for torrenting
     VpnSetup,
 }
 
@@ -150,29 +150,55 @@ fn setup_vpn_config(root: &PathBuf) {
     let auth_file = vpn_dir.join("auth.txt");
     let ovpn_file = vpn_dir.join("nordvpn.ovpn");
     
+    println!("NordVPN Setup for Secure Torrenting");
+    println!("=====================================");
+    println!();
+    println!("Required files:");
+    println!("1. NordVPN OpenVPN configuration file (.ovpn)");
+    println!("2. NordVPN service credentials");
+    println!();
+    
     // Check if OpenVPN config exists
     if !ovpn_file.exists() {
-        println!("NordVPN OpenVPN configuration not found.");
-        println!("Download your .ovpn file from: https://my.nordaccount.com/dashboard/nordvpn/");
+        println!("OpenVPN configuration not found.");
+        println!();
+        println!("Download your .ovpn file from:");
+        println!("https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/openvpn/");
+        println!();
         println!("Place it at: {}", ovpn_file.display());
         println!();
+    } else {
+        println!("OpenVPN configuration found: {}", ovpn_file.display());
     }
     
     // Setup auth file
-    println!("Setting up NordVPN credentials...");
-    println!("Enter your NordVPN service credentials (NOT your account login):");
+    println!("Setting up NordVPN service credentials...");
+    println!();
+    println!("Get your service credentials from:");
+    println!("https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/service-credentials/");
+    println!();
     
-    print!("Username: ");
+    print!("Service Username: ");
     io::stdout().flush().unwrap();
     let mut username = String::new();
     io::stdin().read_line(&mut username).unwrap();
     let username = username.trim();
     
-    print!("Password: ");
+    if username.is_empty() {
+        eprintln!("\x1b[31mError:\x1b[0m Username cannot be empty");
+        std::process::exit(1);
+    }
+    
+    print!("Service Password: ");
     io::stdout().flush().unwrap();
     let mut password = String::new();
     io::stdin().read_line(&mut password).unwrap();
     let password = password.trim();
+    
+    if password.is_empty() {
+        eprintln!("\x1b[31mError:\x1b[0m Password cannot be empty");
+        std::process::exit(1);
+    }
     
     let auth_content = format!("{}\n{}\n", username, password);
     
@@ -191,13 +217,22 @@ fn setup_vpn_config(root: &PathBuf) {
     }
     
     println!("Credentials saved to: {}", auth_file.display());
+    println!();
     
+    // Summary
     if ovpn_file.exists() {
-        println!("Setup complete! You can now start the torrenting container with:");
-        println!("  doc start torrenting");
+        println!("Setup complete. Both files are ready:");
+        println!("  OpenVPN config: {}", ovpn_file.display());
+        println!("  Credentials: {}", auth_file.display());
+        println!();
+        println!("Start the container: doc start torrenting");
+        println!("Access Web UI: http://localhost:8081 (admin/adminadmin)");
     } else {
-        println!("Setup incomplete. Please place your NordVPN .ovpn file at:");
-        println!("  {}", ovpn_file.display());
+        println!("Setup incomplete. You still need to:");
+        println!("  1. Download your NordVPN .ovpn file");
+        println!("  2. Place it at: {}", ovpn_file.display());
+        println!();
+        println!("Then run: doc start torrenting");
     }
 }
 

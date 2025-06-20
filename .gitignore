@@ -4,3 +4,7 @@
 
 **/target/
 **/Cargo.lock
+
+torrenting/data/*
+auth.*
+*.ovpn
