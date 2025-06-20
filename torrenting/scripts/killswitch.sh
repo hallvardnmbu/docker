@@ -41,6 +41,6 @@ iptables -A INPUT -i tun+ -j ACCEPT
 iptables -A OUTPUT -o tun+ -j ACCEPT
 
 # Allow qBittorrent web UI from local network
-iptables -A INPUT -p tcp --dport 8080 -s 172.16.0.0/12 -j ACCEPT
+iptables -A INPUT -p tcp --dport 8081 -s 172.16.0.0/12 -j ACCEPT
 
 echo "VPN kill switch activated"

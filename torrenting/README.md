@@ -6,12 +6,13 @@ Containerized qBittorrent with mandatory NordVPN protection and kill switch.
 
 - Active NordVPN subscription
 - Docker and Docker Compose
+- E:\ drive available for downloads
 
 ## Setup
 
 1. Download NordVPN OpenVPN configuration from your account dashboard
 2. Place the .ovpn file at `data/vpn/nordvpn.ovpn`
-3. Run `doc vpn-setup` to configure your NordVPN credentials interactively
+3. Run `doc setup` to configure your NordVPN credentials and qBittorrent password
 
 Note: Use NordVPN service credentials, not your account login.
 
@@ -23,8 +24,8 @@ doc start torrenting
 ```
 
 Access qBittorrent Web UI at `http://localhost:8081`
-- Default credentials: admin / adminadmin
-- Change the password immediately
+- Downloads will be saved to E:\ drive
+- Use credentials from setup (admin / your_password)
 
 ## Security Features
 

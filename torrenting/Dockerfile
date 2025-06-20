@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
-    curl wget git vim htop build-essential sudo \
+    curl wget git vim htop build-essential sudo dos2unix \
     openvpn iptables qbittorrent-nox iproute2 net-tools dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,13 +18,15 @@ WORKDIR /home
 
 COPY scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
 COPY scripts/killswitch.sh /usr/local/bin/killswitch.sh
-RUN chmod +x /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh
+RUN dos2unix /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh && \
+    chmod +x /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh && \
+    ls -la /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh
 
 # Create .bashrc for playground user and set custom prompt
 RUN touch /home/.bashrc && \
     chown playground:playground /home/.bashrc && \
     echo 'export PS1="\[\033[01;32m\]torrent@vpn\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "' >> /home/.bashrc
 
-EXPOSE 8080
+EXPOSE 8081
 
 CMD ["/usr/local/bin/start-vpn.sh"]

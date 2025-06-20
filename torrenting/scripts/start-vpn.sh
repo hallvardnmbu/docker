@@ -45,14 +45,29 @@ if [ "$EUID" -eq 0 ]; then
     EXTERNAL_IP=$(curl -s --max-time 10 ifconfig.me || echo "Could not determine IP")
     echo "External IP: $EXTERNAL_IP"
     
+    # Create qBittorrent config directory with proper ownership
+    mkdir -p /home/config/qBittorrent
+    chown -R playground:playground /home/config
+    
+    # Display password info if custom password file exists
+    if [ -f "/home/config/qbt_password.txt" ]; then
+        QB_PASSWORD=$(cat /home/config/qbt_password.txt)
+        echo "Custom qBittorrent password available in: /home/config/qbt_password.txt"
+        echo "First login with: admin / adminadmin"
+        echo "Then change password to: $QB_PASSWORD"
+    else
+        echo "Using qBittorrent default credentials: admin / adminadmin"
+        echo "Change password immediately after first login!"
+    fi
+    
     echo "Starting qBittorrent..."
-    sudo -u playground /usr/bin/qbittorrent-nox \
-        --webui-port=8080 \
+    echo "y" | sudo -u playground /usr/bin/qbittorrent-nox \
+        --webui-port=8081 \
         --save-path=/home/downloads \
         --profile=/home/config
 else
-    exec /usr/bin/qbittorrent-nox \
-        --webui-port=8080 \
+    echo "y" | exec /usr/bin/qbittorrent-nox \
+        --webui-port=8081 \
         --save-path=/home/downloads \
         --profile=/home/config
 fi
