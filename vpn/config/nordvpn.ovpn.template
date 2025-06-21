@@ -1,0 +1,38 @@
+# NordVPN OpenVPN Configuration Template
+# Download your actual configuration from:
+# https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/openvpn/
+
+# This is just a template - replace with your actual NordVPN .ovpn file
+# The file should contain:
+# - server endpoints
+# - certificates
+# - authentication settings
+# - protocol configuration
+
+# Example structure (your actual file will have different values):
+# client
+# dev tun
+# proto udp
+# remote [server-address] [port]
+# resolv-retry infinite
+# nobind
+# persist-key
+# persist-tun
+# remote-cert-tls server
+# comp-lzo
+# verb 3
+# auth-user-pass
+# 
+# <ca>
+# [certificate data]
+# </ca>
+# 
+# <cert>
+# [certificate data]
+# </cert>
+# 
+# <key>
+# [private key data]
+# </key>
+
+# IMPORTANT: Replace this template with your actual NordVPN configuration!

@@ -36,13 +36,12 @@ RUN mkdir -p /etc/openvpn/nordvpn /home/data && \
 WORKDIR /home
 RUN chown playground:playground /home
 
-# Copy shared VPN scripts and service-specific scripts
-COPY docker/common/scripts/killswitch.sh /usr/local/bin/killswitch.sh
-COPY docker/common/scripts/health-check.sh /usr/local/bin/health-check.sh
-COPY docker/common/scripts/start-vpn-base.sh /usr/local/bin/start-vpn-base.sh
-COPY docker/common/scripts/start-vpn-javascript.sh /usr/local/bin/start-vpn.sh
-RUN dos2unix /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn-base.sh /usr/local/bin/start-vpn.sh && \
-    chmod +x /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn-base.sh /usr/local/bin/start-vpn.sh
+# Copy centralized VPN scripts
+COPY ../vpn/scripts/killswitch.sh /usr/local/bin/killswitch.sh
+COPY ../vpn/scripts/health-check.sh /usr/local/bin/health-check.sh
+COPY ../vpn/scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
+RUN dos2unix /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn.sh && \
+    chmod +x /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn.sh
 
 # Switch to non-root user
 USER playground
@@ -68,7 +67,7 @@ RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="~/.bun/bin:$PATH"
 
 # Default command - start VPN and development environment
-CMD ["/usr/local/bin/start-vpn.sh"]
+CMD ["/usr/local/bin/start-vpn.sh", "javascript"]
 
 # Expose a port for potential web applications
 EXPOSE 8080
