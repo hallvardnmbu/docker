@@ -29,25 +29,45 @@ verify_openvpn_process() {
 
 # Function to test VPN connectivity with multiple endpoints
 test_vpn_connectivity() {
-    local timeout=30
+    local timeout=10  # Reduced timeout for faster feedback
     
-    # Test with multiple endpoints and longer timeout
-    if timeout $timeout curl -s --interface tun0 https://httpbin.org/ip > /tmp/ip_test 2>&1; then
+    # First check if tun0 interface is actually configured
+    if ! ip addr show tun0 >/dev/null 2>&1; then
+        echo "  - tun0 interface not ready"
+        return 1
+    fi
+    
+    # Test with multiple endpoints with shorter timeout
+    echo "  - Testing connectivity through tun0..."
+    if timeout $timeout curl -s --max-time $timeout --interface tun0 https://httpbin.org/ip > /tmp/ip_test 2>&1; then
         EXTERNAL_IP=$(cat /tmp/ip_test | grep -o '"origin":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+        echo "  - Connected! External IP: $EXTERNAL_IP"
         return 0
     fi
     
     # Alternative test with different endpoint
-    if timeout $timeout curl -s --interface tun0 https://icanhazip.com > /tmp/ip_test2 2>&1; then
+    echo "  - Trying alternate endpoint..."
+    if timeout $timeout curl -s --max-time $timeout --interface tun0 https://icanhazip.com > /tmp/ip_test2 2>&1; then
         EXTERNAL_IP=$(cat /tmp/ip_test2 | tr -d '\n' || echo "unknown")
+        echo "  - Connected! External IP: $EXTERNAL_IP"
         return 0
     fi
     
     # Third fallback
-    if timeout $timeout curl -s --interface tun0 https://api.ipify.org > /tmp/ip_test3 2>&1; then
+    echo "  - Trying final fallback endpoint..."
+    if timeout $timeout curl -s --max-time $timeout --interface tun0 https://api.ipify.org > /tmp/ip_test3 2>&1; then
         EXTERNAL_IP=$(cat /tmp/ip_test3 | tr -d '\n' || echo "unknown")
+        echo "  - Connected! External IP: $EXTERNAL_IP"
         return 0
     fi
+    
+    # Show debug info on failure
+    echo "  - All connectivity tests failed. Debug info:"
+    echo "    tun0 status: $(ip addr show tun0 2>/dev/null | grep 'inet ' || echo 'No IP assigned')"
+    echo "    DNS resolution: $(nslookup google.com 2>&1 | head -2 || echo 'DNS failed')"
+    echo "    Routing table: $(ip route | grep tun0 || echo 'No VPN routes')"
+    echo "    Last curl error: $(cat /tmp/ip_test3 2>/dev/null || echo 'No error log')"
+    echo "    OpenVPN process: $(pgrep openvpn > /dev/null && echo 'Running' || echo 'Not running')"
     
     return 1
 }
@@ -62,29 +82,43 @@ echo "Setting up enhanced VPN kill switch..."
 export DOCKER_SUBNET
 /usr/local/bin/killswitch.sh "${SERVICE_TYPE}" "${DOCKER_SUBNET}"
 
-# Check for NordVPN configuration
-if [ ! -f "/etc/openvpn/nordvpn/nordvpn.ovpn" ]; then
-    echo "ERROR: NordVPN configuration file not found at /etc/openvpn/nordvpn/nordvpn.ovpn"
-    echo "Download from: https://my.nordaccount.com/dashboard/nordvpn/"
-    exit 1
-fi
+# Check for NordVPN configuration - wait for it if missing
+while [ ! -f "/etc/openvpn/nordvpn/nordvpn.ovpn" ] || [ ! -f "/etc/openvpn/nordvpn/auth.txt" ]; do
+    echo "❌ VPN configuration files not found. Waiting for setup..."
+    echo ""
+    echo "Missing files:"
+    [ ! -f "/etc/openvpn/nordvpn/nordvpn.ovpn" ] && echo "  - /etc/openvpn/nordvpn/nordvpn.ovpn"
+    [ ! -f "/etc/openvpn/nordvpn/auth.txt" ] && echo "  - /etc/openvpn/nordvpn/auth.txt"
+    echo ""
+    echo "📋 To set up VPN configuration:"
+    echo "   1. Run: doc setup ${SERVICE_TYPE}"
+    echo "   2. Or manually create the files:"
+    echo "      - Download OpenVPN config from: https://my.nordaccount.com/dashboard/nordvpn/"
+    echo "      - Create auth.txt with your NordVPN service credentials"
+    echo ""
+    echo "⏳ Checking again in 30 seconds..."
+    sleep 30
+done
 
-if [ ! -f "/etc/openvpn/nordvpn/auth.txt" ]; then
-    echo "ERROR: NordVPN authentication file not found at /etc/openvpn/nordvpn/auth.txt"
-    echo "Create file with your NordVPN service credentials (username on line 1, password on line 2)"
-    exit 1
-fi
+echo "✅ VPN configuration files found!"
+
+# Initialize OpenVPN log file with proper permissions
+echo "Initializing OpenVPN logging..."
+touch /tmp/openvpn.log
+chmod 644 /tmp/openvpn.log
+echo "$(date): Starting NordVPN connection..." > /tmp/openvpn.log
 
 echo "Starting NordVPN connection..."
 # Start OpenVPN with enhanced configuration and logging
 openvpn --config /etc/openvpn/nordvpn/nordvpn.ovpn \
         --auth-user-pass /etc/openvpn/nordvpn/auth.txt \
         --script-security 2 \
-        --log /tmp/openvpn.log \
-        --verb 3 \
-        --up-delay \
-        --up-restart \
-        --down-pre \
+        --log-append /tmp/openvpn.log \
+        --verb 4 \
+        --pull \
+        --persist-tun \
+        --persist-key \
+        --comp-lzo no \
         --daemon
 
 # Verify OpenVPN process is running
@@ -94,41 +128,78 @@ if ! verify_openvpn_process; then
     exit 1
 fi
 
+# Fix DNS configuration to use external DNS servers instead of Docker's embedded DNS
+# This needs to happen BEFORE connectivity testing
+echo "🔧 Configuring DNS for VPN compatibility..."
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
 echo "Waiting for VPN connection (timeout: ${VPN_TIMEOUT}s)..."
 
 # Enhanced VPN verification with better routing checks
+connectivity_attempts=0
+max_connectivity_attempts=3
+
 for i in $(seq 1 $VPN_TIMEOUT); do
     # Check for proper routing (both halves of the internet)
     if ip route | grep -q "0.0.0.0/1.*tun0" && ip route | grep -q "128.0.0.0/1.*tun0"; then
-        echo "VPN routing detected, testing connectivity..."
-        sleep 3
+        echo "VPN routing detected, testing connectivity... (attempt $((connectivity_attempts + 1))/$max_connectivity_attempts)"
         
         if test_vpn_connectivity; then
-            echo "VPN connection established successfully"
+            echo "✅ VPN connection established successfully"
             echo "External IP: $EXTERNAL_IP"
             break
         fi
+        
+        connectivity_attempts=$((connectivity_attempts + 1))
+        if [ $connectivity_attempts -ge $max_connectivity_attempts ]; then
+            echo "❌ VPN connectivity test failed after $max_connectivity_attempts attempts"
+            echo "Routing is configured but external connectivity is not working."
+            echo "This might be due to:"
+            echo "  - Firewall blocking VPN traffic"
+            echo "  - DNS resolution issues"
+            echo "  - VPN server connectivity problems"
+            echo ""
+            echo "OpenVPN logs:"
+            cat /tmp/openvpn.log || echo "No OpenVPN logs available"
+            exit 1
+        fi
+        
+        echo "  - Connectivity test failed, waiting 10 seconds before retry..."
+        sleep 10
     fi
     
     if [ $i -eq $VPN_TIMEOUT ]; then
-        echo "ERROR: VPN connection failed after $((VPN_TIMEOUT / 60)) minutes"
+        echo "❌ VPN connection setup failed after $((VPN_TIMEOUT / 60)) minutes"
+        echo ""
+        echo "Debug information:"
         echo "OpenVPN logs:"
         cat /tmp/openvpn.log || echo "No OpenVPN logs available"
+        echo ""
         echo "Network interfaces:"
         ip addr show
+        echo ""
         echo "Routing table:"
         ip route
+        echo ""
         echo "DNS test:"
-        nslookup google.com || echo "DNS resolution failed"
+        nslookup google.com 2>&1 || echo "DNS resolution failed"
         exit 1
     fi
     
     # More informative progress updates
-    if [ $((i % 10)) -eq 0 ]; then
-        echo "Waiting for VPN... ($i/${VPN_TIMEOUT}s)"
+    if [ $((i % 15)) -eq 0 ]; then
+        echo "⏳ Waiting for VPN connection... ($i/${VPN_TIMEOUT}s)"
         # Show basic connection status
         if ip route | grep -q tun0; then
             echo "  - tun0 interface exists"
+            # Check if OpenVPN is still running
+            if pgrep openvpn > /dev/null; then
+                echo "  - OpenVPN process is running"
+            else
+                echo "  - ⚠️  OpenVPN process not found, connection may have failed"
+            fi
         else
             echo "  - waiting for tun0 interface"
         fi

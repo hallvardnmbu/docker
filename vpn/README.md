@@ -12,7 +12,7 @@ vpn/
 │   ├── health-check.sh   # VPN health check script
 │   └── setup-vpn.sh      # Interactive VPN setup script
 ├── config/           # Configuration templates
-│   └── nordvpn.ovpn.template  # Template for NordVPN config
+│   └── nordvpn.ovpn  # NordVPN config
 └── README.md         # This file
 ```
 

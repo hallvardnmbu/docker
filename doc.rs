@@ -55,6 +55,78 @@ enum Commands {
     KillswitchCheck { language: String },
 }
 
+#[cfg(target_os = "windows")]
+fn execute_script_windows(script_path: &PathBuf, service_name: &str, data_dir: &PathBuf, root: &PathBuf) -> std::process::ExitStatus {
+    // Try Git Bash first (most reliable on Windows)
+    println!("Attempting to run script via Git Bash...");
+    let git_bash_paths = [
+        "C:\\Program Files\\Git\\bin\\bash.exe",
+        "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+        "bash.exe", // If it's in PATH
+    ];
+    
+    for bash_path in &git_bash_paths {
+        let git_bash_result = Command::new(bash_path)
+            .arg(script_path)
+            .arg(service_name)
+            .arg(data_dir)
+            .current_dir(root)
+            .status();
+            
+        if let Ok(status) = git_bash_result {
+            return status;
+        }
+    }
+    
+    // Try WSL as fallback (if available and properly configured)
+    println!("Git Bash not found, trying WSL...");
+    let script_unix_path = format!("/{}", script_path.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
+    let data_unix_path = format!("/{}", data_dir.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
+    let root_unix_path = format!("/{}", root.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
+    
+    let wsl_result = Command::new("wsl")
+        .arg("bash")
+        .arg("-c")
+        .arg(&format!("cd '{}' && bash '{}' '{}' '{}'", 
+                     root_unix_path,
+                     script_unix_path,
+                     service_name, 
+                     data_unix_path))
+        .status();
+    
+    if let Ok(status) = wsl_result {
+        return status;
+    }
+    
+    // Final fallback: PowerShell with WSL
+    println!("WSL direct execution failed, trying PowerShell + WSL...");
+    let ps_command = format!(
+        "wsl bash -c \"cd '{}' && bash '{}' '{}' '{}'\"",
+        root_unix_path,
+        script_unix_path,
+        service_name,
+        data_unix_path
+    );
+    
+    let ps_result = Command::new("powershell")
+        .arg("-Command")
+        .arg(&ps_command)
+        .status();
+        
+    match ps_result {
+        Ok(status) => status,
+        Err(_) => {
+            eprintln!("\x1b[31mError:\x1b[0m Failed to execute VPN setup script on Windows.");
+            eprintln!("Please ensure one of the following is available:");
+            eprintln!("  - Git Bash (recommended)");
+            eprintln!("  - WSL (Windows Subsystem for Linux) with bash installed");
+            eprintln!("\nAlternatively, you can run the setup script manually:");
+            eprintln!("  bash \"{}\" {} \"{}\"", script_path.display(), service_name, data_dir.display());
+            std::process::exit(1);
+        }
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
     match &cli.command {
@@ -141,9 +213,27 @@ fn resolve_root(cli_root: Option<&PathBuf>) -> PathBuf {
 }
 
 fn setup_project_and_service(root: &PathBuf, service: Option<&str>) {
-    // First, ensure project root is configured
-    if !root.exists() || !root.is_dir() {
+    // First, check if project root is properly configured
+    // We need to check if the config file exists and contains a valid path
+    let is_configured = if let Some(home) = dirs::home_dir() {
+        let config_path = home.join(CONFIG_FILE);
+        if let Ok(path) = fs::read_to_string(&config_path) {
+            let trimmed = path.trim();
+            !trimmed.is_empty() && Path::new(trimmed).exists() && Path::new(trimmed).is_dir()
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+    
+    if !is_configured {
         setup_project_root();
+        // After setup, we need to resolve the root again to get the newly configured path
+        let new_root = resolve_root(None);
+        // Recursively call ourselves with the new root
+        setup_project_and_service(&new_root, service);
+        return;
     }
     
     // If no service specified, just setup project root
@@ -188,13 +278,22 @@ fn setup_project_and_service(root: &PathBuf, service: Option<&str>) {
         std::process::exit(1);
     }
     
-    let status = Command::new("bash")
-        .arg(&vpn_setup_script)
-        .arg(service_name)
-        .arg(&data_dir)
-        .current_dir(root)
-        .status()
-        .expect("Failed to run VPN setup script");
+    println!("Running VPN setup script...");
+    
+    // Cross-platform script execution
+    let status = if cfg!(target_os = "windows") {
+        // On Windows, try multiple approaches
+        execute_script_windows(&vpn_setup_script, service_name, &data_dir, root)
+    } else {
+        // On Unix-like systems, use bash directly
+        Command::new("bash")
+            .arg(&vpn_setup_script)
+            .arg(service_name)
+            .arg(&data_dir)
+            .current_dir(root)
+            .status()
+            .expect("Failed to run VPN setup script")
+    };
     
     if !status.success() {
         eprintln!("\x1b[31mError:\x1b[0m VPN setup failed");
@@ -447,7 +546,7 @@ fn test_functionality(root: &PathBuf, language: &str) {
     println!("\nTest complete! If all tests pass, your {} setup should be working correctly.", language);
 }
 
-fn check_vpn_connection(root: &PathBuf, language: &str) {
+fn check_vpn_connection(_root: &PathBuf, language: &str) {
     let supported_services = ["torrenting", "javascript"];
     if !supported_services.contains(&language) {
         eprintln!("\x1b[31mError:\x1b[0m VPN check only available for: {}", supported_services.join(", "));
@@ -491,7 +590,7 @@ fn check_vpn_connection(root: &PathBuf, language: &str) {
     }
 }
 
-fn check_killswitch(root: &PathBuf, language: &str) {
+fn check_killswitch(_root: &PathBuf, language: &str) {
     let supported_services = ["torrenting", "javascript"];
     if !supported_services.contains(&language) {
         eprintln!("\x1b[31mError:\x1b[0m Killswitch check only available for: {}", supported_services.join(", "));
@@ -516,7 +615,7 @@ fn check_killswitch(root: &PathBuf, language: &str) {
     // Check iptables rules
     println!("Checking iptables rules...");
     let iptables_output = Command::new("docker")
-        .args(&["exec", &container_name, "iptables", "-L", "-n"])
+        .args(&["exec", &container_name, "iptables", "-L", "-n", "-v"])
         .output();
         
     match iptables_output {

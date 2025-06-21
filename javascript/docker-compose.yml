@@ -13,11 +13,11 @@ services:
       - "127.0.0.1:5173:5173"
     volumes:
       # Bind mount to local directory
-      - ./javascript/data:/home/data
+      - ./data:/home/data
       - ../../snublejuice:/home/snublejuice
       
       # VPN configuration mount
-      - ./javascript/data/vpn:/etc/openvpn/nordvpn
+      - ../vpn/config:/etc/openvpn/nordvpn
       
       # Temporary filesystem for /tmp
       - type: tmpfs
@@ -58,18 +58,13 @@ services:
       timeout: 30s
       retries: 3
       start_period: 2m
-    # Read-only root filesystem (optional - uncomment if you want extra isolation)
-    # read_only: true
-    # tmpfs:
-    #   - /tmp
-    #   - /var/tmp
-
+      
 networks:
   playground-net:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.25.0.0/16
+        - subnet: 172.26.0.0/16
 
 # Define named volumes
 volumes:

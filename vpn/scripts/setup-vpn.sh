@@ -9,7 +9,6 @@ SERVICE_TYPE=${1:-default}
 DATA_DIR=${2:-data}
 
 echo "🛡️  ${SERVICE_TYPE^} Container VPN Setup"
-echo "======================================"
 
 # Create VPN directory if it doesn't exist
 VPN_DIR="${DATA_DIR}/vpn"
