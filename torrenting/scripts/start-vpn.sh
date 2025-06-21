@@ -22,32 +22,55 @@ if [ "$EUID" -eq 0 ]; then
     fi
     
     echo "Starting NordVPN connection..."
-    openvpn --config /etc/openvpn/nordvpn/nordvpn.ovpn --auth-user-pass /etc/openvpn/nordvpn/auth.txt --daemon
+    # Start OpenVPN with better configuration
+    openvpn --config /etc/openvpn/nordvpn/nordvpn.ovpn \
+            --auth-user-pass /etc/openvpn/nordvpn/auth.txt \
+            --script-security 2 \
+            --up-delay \
+            --up-restart \
+            --down-pre \
+            --daemon
     
     echo "Waiting for VPN connection..."
-    sleep 10
+    sleep 15
     
-    # Verify VPN connection
-    for i in {1..30}; do
+    # Verify VPN connection with better checking
+    echo "Verifying VPN connection..."
+    for i in {1..60}; do
         if ip route | grep -q tun0; then
-            echo "VPN connection established"
-            break
+            echo "VPN interface detected, verifying external connectivity..."
+            sleep 5
+            # Test external connectivity through VPN
+            if curl -s --max-time 15 --interface tun0 https://httpbin.org/ip > /dev/null; then
+                EXTERNAL_IP=$(curl -s --max-time 10 --interface tun0 https://httpbin.org/ip | grep -o '"origin":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+                echo "VPN connection established successfully"
+                echo "External IP: $EXTERNAL_IP"
+                break
+            fi
         fi
-        if [ $i -eq 30 ]; then
-            echo "ERROR: VPN connection failed"
+        if [ $i -eq 60 ]; then
+            echo "ERROR: VPN connection failed or external connectivity not working"
+            echo "Debug info:"
+            ip route | grep tun || echo "|No tun interface found"
+            echo "OpenVPN logs:"
+            journalctl -u openvpn --no-pager -n 20 || echo "No systemd logs available"
             exit 1
         fi
-        echo "Waiting for VPN... ($i/30)"
+        echo "Waiting for VPN... ($i/60)"
         sleep 2
     done
-    
-    # Check external IP
-    EXTERNAL_IP=$(curl -s --max-time 10 http://34.160.111.145 -H "Host: ifconfig.me" || echo "Could not determine IP")
-    echo "External IP: $EXTERNAL_IP"
     
     # Create qBittorrent config directory with proper ownership
     mkdir -p /home/config/qBittorrent
     chown -R playground:playground /home/config
+    
+    # Copy default qBittorrent configuration if not exists
+    if [ ! -f "/home/config/qBittorrent/qBittorrent.conf" ]; then
+        echo "Setting up qBittorrent configuration..."
+        cp /etc/qbittorrent/qbittorrent.conf /home/config/qBittorrent/qBittorrent.conf
+        chown playground:playground /home/config/qBittorrent/qBittorrent.conf
+        echo "Default qBittorrent configuration applied"
+    fi
     
     # Display password info if custom password file exists
     if [ -f "/home/config/qbt_password.txt" ]; then
@@ -61,11 +84,30 @@ if [ "$EUID" -eq 0 ]; then
     fi
     
     echo "Starting qBittorrent..."
+    echo "Access Web UI at: http://localhost:8081"
+    echo "Downloads will be saved to: /home/downloads"
+    
+    # Start qBittorrent as playground user with proper configuration
     echo "y" | sudo -u playground /usr/bin/qbittorrent-nox \
         --webui-port=8081 \
         --save-path=/home/downloads \
-        --profile=/home/config
+        --profile=/home/config \
+        --no-daemon &
+    
+    # Wait a bit for qBittorrent to start
+    sleep 10
+    
+    # Verify qBittorrent is running
+    if curl -s --max-time 5 http://localhost:8081 > /dev/null; then
+        echo "qBittorrent started successfully and is accessible"
+    else
+        echo "WARNING: qBittorrent might not be fully started yet, check logs if issues persist"
+    fi
+    
+    # Keep container running and monitor processes
+    wait
 else
+    echo "Starting qBittorrent as non-root user..."
     echo "y" | exec /usr/bin/qbittorrent-nox \
         --webui-port=8081 \
         --save-path=/home/downloads \

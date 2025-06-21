@@ -43,6 +43,10 @@ enum Commands {
     Init,
     /// Setup NordVPN config, credentials, and qBittorrent password for torrenting
     Setup,
+    /// Check torrenting container status and VPN connection
+    Status { language: String },
+    /// Test VPN and qBittorrent functionality
+    Test { language: String },
 }
 
 fn main() {
@@ -54,6 +58,14 @@ fn main() {
         }
         Commands::Setup => {
             setup_torrenting(&resolve_root(cli.root.as_ref()));
+            return;
+        }
+        Commands::Status { language } => {
+            check_status(&resolve_root(cli.root.as_ref()), language);
+            return;
+        }
+        Commands::Test { language } => {
+            test_functionality(&resolve_root(cli.root.as_ref()), language);
             return;
         }
         _ => {}
@@ -93,6 +105,8 @@ fn main() {
         Commands::Logs { language, extra } => run_compose(&root, cli.service.as_deref().unwrap_or(language), language, "logs", extra),
         Commands::Init => unreachable!(),
         Commands::Setup => unreachable!(),
+        Commands::Status { .. } => unreachable!(),
+        Commands::Test { .. } => unreachable!(),
     }
 }
 
@@ -141,6 +155,7 @@ fn setup_config() {
 fn setup_torrenting(root: &PathBuf) {
     let vpn_dir = root.join("torrenting").join("data").join("vpn");
     let config_dir = root.join("torrenting").join("data").join("config");
+    let downloads_dir = root.join("torrenting").join("data").join("downloads");
     
     // Create directories if they don't exist
     if let Err(e) = fs::create_dir_all(&vpn_dir) {
@@ -149,6 +164,10 @@ fn setup_torrenting(root: &PathBuf) {
     }
     if let Err(e) = fs::create_dir_all(&config_dir) {
         eprintln!("\x1b[31mError:\x1b[0m Failed to create config directory: {}", e);
+        std::process::exit(1);
+    }
+    if let Err(e) = fs::create_dir_all(&downloads_dir) {
+        eprintln!("\x1b[31mError:\x1b[0m Failed to create downloads directory: {}", e);
         std::process::exit(1);
     }
     
@@ -265,15 +284,20 @@ fn setup_torrenting(root: &PathBuf) {
         println!("  OpenVPN config: {}", ovpn_file.display());
         println!("  VPN credentials: {}", auth_file.display());
         println!("  qBittorrent password: {}", password_file.display());
+        println!("  Downloads directory: {}", downloads_dir.display());
         println!();
-        println!("Start the container: doc start torrenting");
-        println!("Access Web UI: http://localhost:8081");
+        println!("Commands:");
+        println!("  Start container: doc start torrenting");
+        println!("  Check status: doc status torrenting");
+        println!("  Run tests: doc test torrenting");
+        println!("  View logs: doc logs torrenting");
+        println!("  Access Web UI: http://localhost:8081");
         println!();
         println!("First login credentials: admin / adminadmin");
         if password_file.exists() {
             let qbt_password = fs::read_to_string(&password_file).unwrap_or_default().trim().to_string();
             println!("Then change password to: {}", qbt_password);
-            println!("(Stored in container at: /home/config/qbt_password.txt)");
+            println!("(Password stored at: {})", password_file.display());
         }
     } else {
         println!("Setup incomplete. You still need to:");
@@ -346,4 +370,147 @@ fn run_compose(root: &PathBuf, service: &str, language: &str, action: &str, extr
     }
     let status = cmd.status().expect("Failed to run docker-compose");
     std::process::exit(status.code().unwrap_or(1));
+}
+
+fn check_status(root: &PathBuf, language: &str) {
+    if language != "torrenting" {
+        eprintln!("\x1b[31mError:\x1b[0m Status check only available for torrenting language");
+        std::process::exit(1);
+    }
+    
+    let compose_file = root.join(language).join("docker-compose.yml");
+    if !compose_file.exists() {
+        eprintln!("\x1b[31mError:\x1b[0m docker-compose.yml not found for language: {}", language);
+        std::process::exit(1);
+    }
+    
+    println!("Checking torrenting container status...");
+    
+    // Check if container is running
+    let output = Command::new("docker")
+        .args(&["ps", "--filter", "name=playground-torrenting", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"])
+        .output()
+        .expect("Failed to run docker ps");
+    
+    let status_output = String::from_utf8_lossy(&output.stdout);
+    println!("Container Status:");
+    println!("{}", status_output);
+    
+    if status_output.contains("playground-torrenting") {
+        println!("\nRunning health check...");
+        let health_output = Command::new("docker")
+            .args(&["exec", "playground-torrenting", "/usr/local/bin/health-check.sh"])
+            .output();
+            
+        match health_output {
+            Ok(output) => {
+                let health_result = String::from_utf8_lossy(&output.stdout);
+                println!("{}", health_result);
+                if !output.status.success() {
+                    let error_result = String::from_utf8_lossy(&output.stderr);
+                    println!("Health check errors: {}", error_result);
+                }
+            },
+            Err(e) => println!("Failed to run health check: {}", e),
+        }
+    } else {
+        println!("Container is not running. Start it with: doc start torrenting");
+    }
+}
+
+fn test_functionality(root: &PathBuf, language: &str) {
+    if language != "torrenting" {
+        eprintln!("\x1b[31mError:\x1b[0m Test functionality only available for torrenting language");
+        std::process::exit(1);
+    }
+    
+    println!("Testing torrenting functionality...");
+    
+    // Test 1: Check if container is running
+    println!("\n1. Checking if container is running...");
+    let output = Command::new("docker")
+        .args(&["ps", "-q", "--filter", "name=playground-torrenting"])
+        .output()
+        .expect("Failed to run docker ps");
+    
+    if output.stdout.is_empty() {
+        println!("❌ Container is not running. Start it with: doc start torrenting");
+        return;
+    }
+    println!("✅ Container is running");
+    
+    // Test 2: Check VPN connection
+    println!("\n2. Testing VPN connection...");
+    let vpn_test = Command::new("docker")
+        .args(&["exec", "playground-torrenting", "ip", "route", "show", "table", "main"])
+        .output();
+    
+    match vpn_test {
+        Ok(output) => {
+            let routes = String::from_utf8_lossy(&output.stdout);
+            if routes.contains("tun0") {
+                println!("✅ VPN interface (tun0) is active");
+            } else {
+                println!("❌ VPN interface not found");
+                println!("Routes: {}", routes);
+            }
+        },
+        Err(e) => println!("❌ Failed to check VPN: {}", e),
+    }
+    
+    // Test 3: Check external IP
+    println!("\n3. Testing external IP through VPN...");
+    let ip_test = Command::new("docker")
+        .args(&["exec", "playground-torrenting", "curl", "-s", "--max-time", "10", "--interface", "tun0", "https://httpbin.org/ip"])
+        .output();
+    
+    match ip_test {
+        Ok(output) => {
+            if output.status.success() {
+                let ip_response = String::from_utf8_lossy(&output.stdout);
+                println!("✅ External IP via VPN: {}", ip_response);
+            } else {
+                println!("❌ Failed to get external IP through VPN");
+            }
+        },
+        Err(e) => println!("❌ Failed to test external IP: {}", e),
+    }
+    
+    // Test 4: Check qBittorrent Web UI
+    println!("\n4. Testing qBittorrent Web UI...");
+    let ui_test = Command::new("curl")
+        .args(&["-s", "--max-time", "5", "http://localhost:8081"])
+        .output();
+    
+    match ui_test {
+        Ok(output) => {
+            if output.status.success() {
+                println!("✅ qBittorrent Web UI is accessible at http://localhost:8081");
+            } else {
+                println!("❌ qBittorrent Web UI is not accessible");
+            }
+        },
+        Err(e) => println!("❌ Failed to test Web UI: {}", e),
+    }
+    
+    // Test 5: Check download directory
+    println!("\n5. Checking download directory...");
+    let downloads_dir = root.join("torrenting").join("data").join("downloads");
+    if downloads_dir.exists() {
+        println!("✅ Downloads directory exists: {}", downloads_dir.display());
+        match fs::metadata(&downloads_dir) {
+            Ok(metadata) => {
+                if metadata.is_dir() {
+                    println!("✅ Downloads directory is accessible");
+                } else {
+                    println!("❌ Downloads path is not a directory");
+                }
+            },
+            Err(e) => println!("❌ Failed to check downloads directory: {}", e),
+        }
+    } else {
+        println!("❌ Downloads directory not found: {}", downloads_dir.display());
+    }
+    
+    println!("\nTest complete! If all tests pass, your torrenting setup should be working correctly.");
 }

@@ -19,28 +19,43 @@ iptables -P OUTPUT DROP
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A OUTPUT -o lo -j ACCEPT
 
-# Allow local network traffic (Docker internal)
+# Allow local network traffic (Docker internal networks)
 iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT
 iptables -A OUTPUT -d 172.16.0.0/12 -j ACCEPT
+
+# Allow traffic to/from Docker bridge networks
+iptables -A INPUT -s 172.27.0.0/16 -j ACCEPT
+iptables -A OUTPUT -d 172.27.0.0/16 -j ACCEPT
 
 # Allow established and related connections
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-# Allow DNS queries for VPN connection establishment
+# Allow DNS queries before VPN connection (essential for VPN connection)
 iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
 iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
 
-# Allow VPN connection establishment
+# Allow VPN connection establishment (OpenVPN standard ports)
 iptables -A OUTPUT -p udp --dport 1194 -j ACCEPT
 iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
 iptables -A OUTPUT -p udp --dport 443 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 1723 -j ACCEPT
 
-# Allow traffic through VPN interface
+# Allow traffic through VPN interface (most important rule)
 iptables -A INPUT -i tun+ -j ACCEPT
 iptables -A OUTPUT -o tun+ -j ACCEPT
+iptables -A FORWARD -i tun+ -j ACCEPT
+iptables -A FORWARD -o tun+ -j ACCEPT
 
-# Allow qBittorrent web UI from local network
+# Allow qBittorrent web UI from Docker networks
 iptables -A INPUT -p tcp --dport 8081 -s 172.16.0.0/12 -j ACCEPT
+iptables -A INPUT -p tcp --dport 8081 -s 172.27.0.0/16 -j ACCEPT
 
-echo "VPN kill switch activated"
+# Allow qBittorrent peer connections through VPN only (these will go through tun interface)
+# The VPN interface rules above will handle this
+
+# Log dropped packets for debugging (optional, remove in production)
+iptables -A INPUT -j LOG --log-prefix "DROPPED INPUT: " --log-level 4
+iptables -A OUTPUT -j LOG --log-prefix "DROPPED OUTPUT: " --log-level 4
+
+echo "VPN kill switch activated - only VPN traffic allowed"

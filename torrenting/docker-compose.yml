@@ -7,6 +7,8 @@ services:
     tty: true
     ports:
       - "127.0.0.1:8081:8081"
+      - "127.0.0.1:6881:6881"
+      - "127.0.0.1:6881:6881/udp"
     volumes:
       - E:/:/home/downloads
       - ./data/config:/home/config
@@ -19,15 +21,13 @@ services:
       - torrenting-net
     environment:
       - TZ=UTC
+      - PUID=1000
+      - PGID=1000
     deploy:
       resources:
         limits:
           memory: 4G
           cpus: '4.0'
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
-    dns_search: []
     cap_drop:
       - ALL
     cap_add:
@@ -40,9 +40,9 @@ services:
       - SETUID
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "--max-time", "10", "http://34.160.111.145", "-H", "Host: ifconfig.me"]
+      test: ["CMD", "/usr/local/bin/health-check.sh"]
       interval: 5m
-      timeout: 10s
+      timeout: 30s
       retries: 3
       start_period: 2m
 
@@ -52,6 +52,9 @@ networks:
     ipam:
       config:
         - subnet: 172.27.0.0/16
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
 
 volumes:
   torrenting-downloads:
