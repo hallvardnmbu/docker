@@ -63,8 +63,10 @@ RUN echo 'alias ll="ls -la"' >> /home/.bashrc && \
 # Install bun for playground user
 RUN su - playground -c 'curl -fsSL https://bun.sh/install | bash' && \
     echo 'export PATH="/home/.bun/bin:$PATH"' >> /home/.bashrc && \
-    chown playground:playground /home/.bashrc
-
+    echo 'export PATH="/home/.bun/bin:$PATH"' >> /home/.profile && \
+    chown playground:playground /home/.bashrc /home/.profile
+ENV PATH="/home/.bun/bin:$PATH"
+    
 # Default command - use new entrypoint that handles VPN setup as root, then switches to playground user
 CMD ["/usr/local/bin/entrypoint.sh", "javascript"]
 
