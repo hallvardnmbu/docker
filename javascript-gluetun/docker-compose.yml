@@ -33,8 +33,8 @@ services:
   # Development Environment - routes through VPN container
   javascript:
     build:
-      context: ..
-      dockerfile: javascript/Dockerfile-simplified
+      context: .
+      dockerfile: Dockerfile
     container_name: playground-javascript
     # Route ALL traffic through VPN container
     network_mode: "service:vpn"

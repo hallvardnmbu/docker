@@ -12,6 +12,7 @@ A simple Rust CLI tool to manage language-specific Docker Compose environments.
 - Forwards extra arguments to `docker-compose`.
 - Always uses the correct compose file for the specified language.
 - Remembers your project root after running `doc setup`.
+- VPN-enabled environments with simplified gluetun-based setups.
 
 ## Usage
 
@@ -47,6 +48,36 @@ doc start javascript --service playground-javascript
 ```
 
 You can override the project root for a single command with `--root <path>`.
+
+## VPN-Enabled Environments
+
+This project includes both traditional and simplified VPN setups:
+
+### Simplified Gluetun Setups (Recommended)
+
+- `doc start torrenting-gluetun` — Torrenting with simplified VPN using gluetun
+- `doc start javascript-gluetun` — JavaScript development with simplified VPN using gluetun
+
+These use the community-maintained `qmcgaw/gluetun` container for reliable VPN management.
+
+**Setup for gluetun:**
+1. Copy `.env.example` to `.env`
+2. Add your NordVPN service credentials to `.env`
+3. Start with `doc start <service>-gluetun`
+
+### Traditional Custom VPN Setups
+
+- `doc setup torrenting` — Set up torrenting with custom VPN scripts
+- `doc setup javascript` — Set up JavaScript development with custom VPN scripts
+
+These use custom VPN management scripts (for advanced users or legacy setups).
+
+### VPN Management Commands
+
+- `doc status <service>` — Check container and VPN status
+- `doc test <service>` — Test VPN and service functionality
+- `doc vpn-check <service>` — Verify VPN connection
+- `doc killswitch-check <service>` — Test VPN killswitch
 
 ## Build instructions
 
