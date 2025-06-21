@@ -2,17 +2,20 @@ services:
   javascript:
     build: .
     container_name: playground-javascript
+    privileged: true
     stdin_open: true
     tty: true
     ports:
       - "127.0.0.1:8080:8080"
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:5173:5173"
     volumes:
-      # Named volume (managed by Docker)
-      # - data:/home/data
-      
       # Bind mount to local directory
       - ./data:/home/data
       - ../../snublejuice:/home/snublejuice
+      
+      # VPN configuration mount
+      - ./data/vpn:/etc/openvpn/nordvpn
       
       # Temporary filesystem for /tmp
       - type: tmpfs
@@ -21,24 +24,37 @@ services:
           size: 100M
     networks:
       - playground-net
+    environment:
+      - TZ=UTC
+      - PUID=1000
+      - PGID=1000
     # Resource limits for safety
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
-    # Security options
+          memory: 2G
+          cpus: '2.0'
+    # Security options - modified for VPN requirements
     security_opt:
       - no-new-privileges:true
-    # Remove capabilities
+    # Capabilities needed for VPN
     cap_drop:
       - ALL
     cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
       - CHOWN
       - DAC_OVERRIDE
       - FOWNER
       - SETGID
       - SETUID
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/health-check.sh"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 2m
     # Read-only root filesystem (optional - uncomment if you want extra isolation)
     # read_only: true
     # tmpfs:
