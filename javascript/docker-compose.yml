@@ -1,6 +1,8 @@
 services:
   javascript:
-    build: .
+    build:
+      context: ..
+      dockerfile: javascript/Dockerfile
     container_name: playground-javascript
     privileged: true
     stdin_open: true
@@ -11,11 +13,11 @@ services:
       - "127.0.0.1:5173:5173"
     volumes:
       # Bind mount to local directory
-      - ./data:/home/data
+      - ./javascript/data:/home/data
       - ../../snublejuice:/home/snublejuice
       
       # VPN configuration mount
-      - ./data/vpn:/etc/openvpn/nordvpn
+      - ./javascript/data/vpn:/etc/openvpn/nordvpn
       
       # Temporary filesystem for /tmp
       - type: tmpfs
