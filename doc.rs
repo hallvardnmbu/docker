@@ -582,7 +582,12 @@ fn test_functionality(root: &PathBuf, language: &str) {
             
             // Test 5: Check download directory
             println!("\n5. Checking download directory...");
-            let downloads_dir = root.join("torrenting").join("data").join("downloads");
+            let service_dir = if language.contains("-gluetun") {
+                language.to_string()
+            } else {
+                "torrenting".to_string()
+            };
+            let downloads_dir = root.join(service_dir).join("data").join("downloads");
             if downloads_dir.exists() {
                 println!("✅ Downloads directory exists: {}", downloads_dir.display());
                 match fs::metadata(&downloads_dir) {
@@ -599,7 +604,7 @@ fn test_functionality(root: &PathBuf, language: &str) {
                 println!("❌ Downloads directory not found: {}", downloads_dir.display());
             }
         },
-        "javascript" => {
+        "javascript" | "javascript-gluetun" => {
             // Test 4: Check development ports
             println!("\n4. Testing development server ports...");
             let ports = [3000, 5173, 8080];
@@ -625,7 +630,12 @@ fn test_functionality(root: &PathBuf, language: &str) {
             
             // Test 5: Check project directory
             println!("\n5. Checking project directory...");
-            let projects_dir = root.join("javascript").join("data").join("projects");
+            let service_dir = if language.contains("-gluetun") {
+                language.to_string()
+            } else {
+                "javascript".to_string()
+            };
+            let projects_dir = root.join(service_dir).join("data").join("projects");
             if projects_dir.exists() {
                 println!("✅ Projects directory exists: {}", projects_dir.display());
             } else {
