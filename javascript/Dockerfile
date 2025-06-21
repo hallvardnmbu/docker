@@ -55,12 +55,13 @@ RUN echo 'alias ll="ls -la"' >> ~/.bashrc && \
     echo 'function c() { git commit -m "$*"; }' >> ~/.bashrc && \
     echo 'function a() { git add "$@"; }' >> ~/.bashrc
 
-# Copy VPN scripts and set permissions
-COPY scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
-COPY scripts/killswitch.sh /usr/local/bin/killswitch.sh
-COPY scripts/health-check.sh /usr/local/bin/health-check.sh
-RUN dos2unix /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh && \
-    chmod +x /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh
+# Copy shared VPN scripts and service-specific scripts
+COPY common/scripts/killswitch.sh /usr/local/bin/killswitch.sh
+COPY common/scripts/health-check.sh /usr/local/bin/health-check.sh
+COPY common/scripts/start-vpn-base.sh /usr/local/bin/start-vpn-base.sh
+COPY common/scripts/start-vpn-javascript.sh /usr/local/bin/start-vpn.sh
+RUN dos2unix /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn-base.sh /usr/local/bin/start-vpn.sh && \
+    chmod +x /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn-base.sh /usr/local/bin/start-vpn.sh
 
 # Install bun
 RUN curl -fsSL https://bun.sh/install | bash

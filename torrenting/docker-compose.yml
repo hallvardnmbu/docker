@@ -23,6 +23,7 @@ services:
       - TZ=UTC
       - PUID=1000
       - PGID=1000
+      - SERVICE_TYPE=torrenting
     deploy:
       resources:
         limits:

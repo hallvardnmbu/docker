@@ -28,6 +28,7 @@ services:
       - TZ=UTC
       - PUID=1000
       - PGID=1000
+      - SERVICE_TYPE=javascript
     # Resource limits for safety
     deploy:
       resources:

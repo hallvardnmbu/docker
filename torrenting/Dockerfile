@@ -16,12 +16,13 @@ RUN mkdir -p /etc/openvpn/nordvpn /home/downloads /home/downloads/incomplete /ho
 
 WORKDIR /home
 
-COPY scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
-COPY scripts/killswitch.sh /usr/local/bin/killswitch.sh
-COPY scripts/health-check.sh /usr/local/bin/health-check.sh
+COPY common/scripts/killswitch.sh /usr/local/bin/killswitch.sh
+COPY common/scripts/health-check.sh /usr/local/bin/health-check.sh
+COPY common/scripts/start-vpn-base.sh /usr/local/bin/start-vpn-base.sh
+COPY common/scripts/start-vpn-torrenting.sh /usr/local/bin/start-vpn.sh
 COPY scripts/qbittorrent.conf /etc/qbittorrent/qbittorrent.conf
-RUN dos2unix /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh && \
-    chmod +x /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh && \
+RUN dos2unix /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn-base.sh /usr/local/bin/start-vpn.sh && \
+    chmod +x /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn-base.sh /usr/local/bin/start-vpn.sh && \
     mkdir -p /etc/qbittorrent && \
     ls -la /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh
 
