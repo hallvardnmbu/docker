@@ -8,9 +8,13 @@ if [ "$EUID" -eq 0 ]; then
     # Run VPN setup
     /usr/local/bin/start-vpn.sh "${1:-javascript}"
     
-    # Switch to playground user for the interactive shell
-    echo "Switching to playground user..."
-    exec su - playground -c "cd /home && exec bash"
+    # Keep the container running without immediately dropping into bash
+    # This allows `doc shell` to work properly
+    echo "VPN setup complete. Container ready for connections."
+    echo "Use 'doc shell javascript' to access the container."
+    
+    # Keep container running
+    tail -f /dev/null
 else
     echo "Already running as non-root user"
     exec bash

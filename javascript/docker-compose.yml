@@ -35,8 +35,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
-          cpus: '2.0'
+          memory: 4G
+          cpus: '4.0'
     # Security options - modified for VPN requirements
     security_opt:
       - no-new-privileges:true

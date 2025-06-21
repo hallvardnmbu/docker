@@ -350,9 +350,19 @@ fn run_compose(root: &PathBuf, service: &str, language: &str, action: &str, extr
     cmd.arg("-f").arg(&*compose_file_str);
     match action {
         "exec" => {
-            cmd.arg(action).arg(service);
-            for arg in extra {
-                cmd.arg(arg);
+            // Special handling for JavaScript to run as playground user
+            if language == "javascript" && extra.len() == 1 && extra[0] == "/bin/bash" {
+                // Use docker directly for JavaScript to switch to playground user
+                let container_name = format!("playground-{}", language);
+                let mut docker_cmd = Command::new("docker");
+                docker_cmd.args(&["exec", "-it", &container_name, "su", "-", "playground"]);
+                let status = docker_cmd.status().expect("Failed to run docker exec");
+                std::process::exit(status.code().unwrap_or(1));
+            } else {
+                cmd.arg(action).arg(service);
+                for arg in extra {
+                    cmd.arg(arg);
+                }
             }
         },
         _ => {
