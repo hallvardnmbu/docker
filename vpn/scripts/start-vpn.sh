@@ -6,13 +6,40 @@ set -euo pipefail
 # Usage: start-vpn.sh [SERVICE_TYPE] [VPN_TIMEOUT] [DOCKER_SUBNET]
 # SERVICE_TYPE: torrenting, javascript, or default
 # VPN_TIMEOUT: timeout in seconds (default: 120)
-# DOCKER_SUBNET: Docker subnet (default: 172.25.0.0/16)
+# DOCKER_SUBNET: Docker subnet (auto-detected if not provided)
 
 SERVICE_TYPE=${1:-default}
 VPN_TIMEOUT=${2:-${VPN_TIMEOUT:-120}}
-DOCKER_SUBNET=${3:-${DOCKER_SUBNET:-172.25.0.0/16}}
+
+# Auto-detect Docker subnet if not provided
+if [ -z "${3:-}" ]; then
+    # Try to detect the Docker network subnet from the container's IP
+    CONTAINER_IP=$(hostname -I | awk '{print $1}')
+    if [ -n "$CONTAINER_IP" ]; then
+        # Extract subnet (assuming /16 mask)
+        DOCKER_SUBNET=$(echo $CONTAINER_IP | cut -d. -f1-2).0.0/16
+        echo "Auto-detected Docker subnet: $DOCKER_SUBNET"
+    else
+        # Fallback based on service type
+        case "${SERVICE_TYPE}" in
+            "torrenting")
+                DOCKER_SUBNET="172.25.0.0/16"
+                ;;
+            "javascript")
+                DOCKER_SUBNET="172.26.0.0/16"
+                ;;
+            *)
+                DOCKER_SUBNET="172.17.0.0/16"
+                ;;
+        esac
+        echo "Using default Docker subnet for ${SERVICE_TYPE}: $DOCKER_SUBNET"
+    fi
+else
+    DOCKER_SUBNET=$3
+fi
 
 echo "Starting secure ${SERVICE_TYPE} container with NordVPN..."
+echo "Docker subnet: $DOCKER_SUBNET"
 
 # Function to verify OpenVPN process is running
 verify_openvpn_process() {
