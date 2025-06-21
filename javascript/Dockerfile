@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update package list and install essential tools
+# Update package list and install essential tools + VPN dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -15,12 +15,22 @@ RUN apt-get update && apt-get install -y \
     zip \
     build-essential \
     sudo \
+    dos2unix \
+    openvpn \
+    iptables \
+    iproute2 \
+    net-tools \
+    dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for safety (password: lavik)
 RUN useradd -m -d /home -s /bin/bash playground && \
     echo "playground:lavik" | chpasswd && \
     usermod -aG sudo playground
+
+# Create VPN and data directories
+RUN mkdir -p /etc/openvpn/nordvpn /home/data && \
+    chown -R playground:playground /home/data
 
 # Set up a working directory
 WORKDIR /home
@@ -45,12 +55,19 @@ RUN echo 'alias ll="ls -la"' >> ~/.bashrc && \
     echo 'function c() { git commit -m "$*"; }' >> ~/.bashrc && \
     echo 'function a() { git add "$@"; }' >> ~/.bashrc
 
+# Copy VPN scripts and set permissions
+COPY scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
+COPY scripts/killswitch.sh /usr/local/bin/killswitch.sh
+COPY scripts/health-check.sh /usr/local/bin/health-check.sh
+RUN dos2unix /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh && \
+    chmod +x /usr/local/bin/start-vpn.sh /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh
+
 # Install bun
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="~/.bun/bin:$PATH"
 
-# Default command
-CMD ["/bin/bash"]
+# Default command - start VPN and development environment
+CMD ["/usr/local/bin/start-vpn.sh"]
 
 # Expose a port for potential web applications
 EXPOSE 8080
