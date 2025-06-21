@@ -377,7 +377,7 @@ fn run_compose(root: &PathBuf, service: &str, language: &str, action: &str, extr
 }
 
 fn check_status(root: &PathBuf, language: &str) {
-    let supported_services = ["torrenting", "javascript"];
+    let supported_services = ["torrenting", "javascript", "torrenting-gluetun", "javascript-gluetun"];
     if !supported_services.contains(&language) {
         eprintln!("\x1b[31mError:\x1b[0m Status check only available for: {}", supported_services.join(", "));
         std::process::exit(1);
@@ -392,7 +392,13 @@ fn check_status(root: &PathBuf, language: &str) {
     println!("Checking {} container status...", language);
     
     // Check if container is running
-    let container_name = format!("playground-{}", language);
+    let container_name = if language.contains("-gluetun") {
+        // For gluetun setups, check the VPN container
+        let base_service = language.replace("-gluetun", "");
+        format!("playground-vpn-{}", base_service)
+    } else {
+        format!("playground-{}", language)
+    };
     let output = Command::new("docker")
         .args(&["ps", "--filter", &format!("name={}", container_name), "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"])
         .output()
@@ -404,20 +410,43 @@ fn check_status(root: &PathBuf, language: &str) {
     
     if status_output.contains(&container_name) {
         println!("\nRunning health check...");
-        let health_output = Command::new("docker")
-            .args(&["exec", &container_name, "/usr/local/bin/health-check.sh", language])
-            .output();
-            
-        match health_output {
-            Ok(output) => {
-                let health_result = String::from_utf8_lossy(&output.stdout);
-                println!("{}", health_result);
-                if !output.status.success() {
-                    let error_result = String::from_utf8_lossy(&output.stderr);
-                    println!("Health check errors: {}", error_result);
-                }
-            },
-            Err(e) => println!("Failed to run health check: {}", e),
+        
+        if language.contains("-gluetun") {
+            // For gluetun setups, check VPN status differently
+            println!("Checking gluetun VPN status...");
+            let health_output = Command::new("docker")
+                .args(&["logs", "--tail", "20", &container_name])
+                .output();
+                
+            match health_output {
+                Ok(output) => {
+                    let logs = String::from_utf8_lossy(&output.stdout);
+                    if logs.contains("VPN is up") || logs.contains("healthy") {
+                        println!("✅ VPN connection is healthy");
+                    } else {
+                        println!("⚠️  VPN status unclear. Recent logs:");
+                        println!("{}", logs);
+                    }
+                },
+                Err(e) => println!("Failed to check VPN status: {}", e),
+            }
+        } else {
+            // Original health check for non-gluetun setups
+            let health_output = Command::new("docker")
+                .args(&["exec", &container_name, "/usr/local/bin/health-check.sh", language])
+                .output();
+                
+            match health_output {
+                Ok(output) => {
+                    let health_result = String::from_utf8_lossy(&output.stdout);
+                    println!("{}", health_result);
+                    if !output.status.success() {
+                        let error_result = String::from_utf8_lossy(&output.stderr);
+                        println!("Health check errors: {}", error_result);
+                    }
+                },
+                Err(e) => println!("Failed to run health check: {}", e),
+            }
         }
     } else {
         println!("Container is not running. Start it with: doc start {}", language);
@@ -425,7 +454,7 @@ fn check_status(root: &PathBuf, language: &str) {
 }
 
 fn test_functionality(root: &PathBuf, language: &str) {
-    let supported_services = ["torrenting", "javascript"];
+    let supported_services = ["torrenting", "javascript", "torrenting-gluetun", "javascript-gluetun"];
     if !supported_services.contains(&language) {
         eprintln!("\x1b[31mError:\x1b[0m Test functionality only available for: {}", supported_services.join(", "));
         std::process::exit(1);
@@ -433,7 +462,13 @@ fn test_functionality(root: &PathBuf, language: &str) {
     
     println!("Testing {} functionality...", language);
     
-    let container_name = format!("playground-{}", language);
+    let container_name = if language.contains("-gluetun") {
+        // For gluetun setups, use the VPN container for testing
+        let base_service = language.replace("-gluetun", "");
+        format!("playground-vpn-{}", base_service)
+    } else {
+        format!("playground-{}", language)
+    };
     
     // Test 1: Check if container is running
     println!("\n1. Checking if container is running...");
@@ -450,44 +485,84 @@ fn test_functionality(root: &PathBuf, language: &str) {
     
     // Test 2: Check VPN connection
     println!("\n2. Testing VPN connection...");
-    let vpn_test = Command::new("docker")
-        .args(&["exec", &container_name, "ip", "route", "show", "table", "main"])
-        .output();
-    
-    match vpn_test {
-        Ok(output) => {
-            let routes = String::from_utf8_lossy(&output.stdout);
-            if routes.contains("tun0") {
-                println!("✅ VPN interface (tun0) is active");
-            } else {
-                println!("❌ VPN interface not found");
-                println!("Routes: {}", routes);
-            }
-        },
-        Err(e) => println!("❌ Failed to check VPN: {}", e),
+    if language.contains("-gluetun") {
+        // For gluetun, check if VPN is up via logs
+        let vpn_test = Command::new("docker")
+            .args(&["logs", "--tail", "10", &container_name])
+            .output();
+        
+        match vpn_test {
+            Ok(output) => {
+                let logs = String::from_utf8_lossy(&output.stdout);
+                if logs.contains("VPN is up") || logs.contains("healthy") {
+                    println!("✅ Gluetun VPN is connected");
+                } else {
+                    println!("⚠️  VPN status unclear from logs");
+                }
+            },
+            Err(e) => println!("❌ Failed to check VPN logs: {}", e),
+        }
+    } else {
+        // Original VPN check for non-gluetun setups
+        let vpn_test = Command::new("docker")
+            .args(&["exec", &container_name, "ip", "route", "show", "table", "main"])
+            .output();
+        
+        match vpn_test {
+            Ok(output) => {
+                let routes = String::from_utf8_lossy(&output.stdout);
+                if routes.contains("tun0") {
+                    println!("✅ VPN interface (tun0) is active");
+                } else {
+                    println!("❌ VPN interface not found");
+                    println!("Routes: {}", routes);
+                }
+            },
+            Err(e) => println!("❌ Failed to check VPN: {}", e),
+        }
     }
     
     // Test 3: Check external IP
     println!("\n3. Testing external IP through VPN...");
-    let ip_test = Command::new("docker")
-        .args(&["exec", &container_name, "curl", "-s", "--max-time", "10", "--interface", "tun0", "https://httpbin.org/ip"])
-        .output();
-    
-    match ip_test {
-        Ok(output) => {
-            if output.status.success() {
-                let ip_response = String::from_utf8_lossy(&output.stdout);
-                println!("✅ External IP via VPN: {}", ip_response);
-            } else {
-                println!("❌ Failed to get external IP through VPN");
-            }
-        },
-        Err(e) => println!("❌ Failed to test external IP: {}", e),
+    if language.contains("-gluetun") {
+        // For gluetun, just test external IP without specifying interface
+        let ip_test = Command::new("docker")
+            .args(&["exec", &container_name, "curl", "-s", "--max-time", "10", "https://ipinfo.io/ip"])
+            .output();
+        
+        match ip_test {
+            Ok(output) => {
+                if output.status.success() {
+                    let ip_response = String::from_utf8_lossy(&output.stdout);
+                    println!("✅ External IP via Gluetun: {}", ip_response.trim());
+                } else {
+                    println!("❌ Failed to get external IP through Gluetun VPN");
+                }
+            },
+            Err(e) => println!("❌ Failed to test external IP: {}", e),
+        }
+    } else {
+        // Original test for non-gluetun setups
+        let ip_test = Command::new("docker")
+            .args(&["exec", &container_name, "curl", "-s", "--max-time", "10", "--interface", "tun0", "https://httpbin.org/ip"])
+            .output();
+        
+        match ip_test {
+            Ok(output) => {
+                if output.status.success() {
+                    let ip_response = String::from_utf8_lossy(&output.stdout);
+                    println!("✅ External IP via VPN: {}", ip_response);
+                } else {
+                    println!("❌ Failed to get external IP through VPN");
+                }
+            },
+            Err(e) => println!("❌ Failed to test external IP: {}", e),
+        }
     }
     
     // Service-specific tests
     match language {
-        "torrenting" => {
+        "torrenting" | "torrenting-gluetun" => {
             // Test 4: Check qBittorrent Web UI
             println!("\n4. Testing qBittorrent Web UI...");
             let ui_test = Command::new("curl")
@@ -507,7 +582,12 @@ fn test_functionality(root: &PathBuf, language: &str) {
             
             // Test 5: Check download directory
             println!("\n5. Checking download directory...");
-            let downloads_dir = root.join("torrenting").join("data").join("downloads");
+            let service_dir = if language.contains("-gluetun") {
+                language.to_string()
+            } else {
+                "torrenting".to_string()
+            };
+            let downloads_dir = root.join(service_dir).join("data").join("downloads");
             if downloads_dir.exists() {
                 println!("✅ Downloads directory exists: {}", downloads_dir.display());
                 match fs::metadata(&downloads_dir) {
@@ -524,7 +604,7 @@ fn test_functionality(root: &PathBuf, language: &str) {
                 println!("❌ Downloads directory not found: {}", downloads_dir.display());
             }
         },
-        "javascript" => {
+        "javascript" | "javascript-gluetun" => {
             // Test 4: Check development ports
             println!("\n4. Testing development server ports...");
             let ports = [3000, 5173, 8080];
@@ -550,7 +630,12 @@ fn test_functionality(root: &PathBuf, language: &str) {
             
             // Test 5: Check project directory
             println!("\n5. Checking project directory...");
-            let projects_dir = root.join("javascript").join("data").join("projects");
+            let service_dir = if language.contains("-gluetun") {
+                language.to_string()
+            } else {
+                "javascript".to_string()
+            };
+            let projects_dir = root.join(service_dir).join("data").join("projects");
             if projects_dir.exists() {
                 println!("✅ Projects directory exists: {}", projects_dir.display());
             } else {
