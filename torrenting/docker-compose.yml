@@ -1,0 +1,63 @@
+services:
+  torrenting:
+    build: .
+    container_name: playground-torrenting
+    privileged: true
+    stdin_open: true
+    tty: true
+    ports:
+      - "127.0.0.1:8081:8081"
+      - "127.0.0.1:6881:6881"
+      - "127.0.0.1:6881:6881/udp"
+    volumes:
+      - E:/:/home/downloads
+      - ./data/config:/home/config
+      - ./data/vpn:/etc/openvpn/nordvpn
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 100M
+    networks:
+      - torrenting-net
+    environment:
+      - TZ=UTC
+      - PUID=1000
+      - PGID=1000
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/health-check.sh"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 2m
+
+networks:
+  torrenting-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.27.0.0/16
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+volumes:
+  torrenting-downloads:
+    driver: local
+  torrenting-config:
+    driver: local
