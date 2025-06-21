@@ -1,0 +1,57 @@
+services:
+  # VPN Container - handles all VPN connectivity
+  vpn:
+    image: qmcgaw/gluetun
+    container_name: playground-vpn-javascript
+    cap_add:
+      - NET_ADMIN
+    environment:
+      # NordVPN configuration
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=${NORDVPN_USER}
+      - OPENVPN_PASSWORD=${NORDVPN_PASSWORD}
+      - SERVER_COUNTRIES=United States
+      
+      # Kill switch (enabled by default)
+      - FIREWALL=on
+      - FIREWALL_VPN_INPUT_PORTS=3000,5173,8080
+      
+      # Health check
+      - HEALTH_VPN_DURATION_INITIAL=30s
+      - HEALTH_VPN_DURATION_ADDITION=5s
+      
+    ports:
+      # Development server ports
+      - "127.0.0.1:3000:3000"   # React/Next.js
+      - "127.0.0.1:5173:5173"   # Vite
+      - "127.0.0.1:8080:8080"   # General dev server
+    restart: unless-stopped
+    networks:
+      - javascript-net
+
+  # Development Environment - routes through VPN container
+  javascript:
+    build:
+      context: ..
+      dockerfile: javascript/Dockerfile-simplified
+    container_name: playground-javascript
+    # Route ALL traffic through VPN container
+    network_mode: "service:vpn"
+    depends_on:
+      - vpn
+    environment:
+      - TZ=UTC
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      # Project directories
+      - ./data:/home/data
+      - ../../snublejuice:/home/snublejuice
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+networks:
+  javascript-net:
+    driver: bridge
