@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand};
 
 const CONFIG_FILE: &str = ".docconfig";
 
-/// Simple CLI to manage language-specific Docker Compose environments
+/// Simple CLI to manage language-specific Docker Compose environments with VPN support
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
@@ -39,25 +39,100 @@ enum Commands {
     Clean { language: String, #[arg(trailing_var_arg = true)] extra: Vec<String> },
     /// Show logs for a language
     Logs { language: String, #[arg(trailing_var_arg = true)] extra: Vec<String> },
-    /// Initialize the project root path
-    Init,
-    /// Setup NordVPN config, credentials, and qBittorrent password for torrenting
-    Setup,
-    /// Check torrenting container status and VPN connection
+    /// Setup project root and VPN configuration for services
+    Setup { 
+        /// Service to setup (torrenting, javascript, or skip for project root only)
+        #[arg(value_name = "SERVICE")]
+        service: Option<String> 
+    },
+    /// Check container status and VPN connection
     Status { language: String },
-    /// Test VPN and qBittorrent functionality
+    /// Test VPN and service functionality
     Test { language: String },
+    /// Verify VPN connection is working
+    VpnCheck { language: String },
+    /// Verify killswitch is properly configured
+    KillswitchCheck { language: String },
+}
+
+#[cfg(target_os = "windows")]
+fn execute_script_windows(script_path: &PathBuf, service_name: &str, project_root: &PathBuf, root: &PathBuf) -> std::process::ExitStatus {
+    // Try Git Bash first (most reliable on Windows)
+    println!("Attempting to run script via Git Bash...");
+    let git_bash_paths = [
+        "C:\\Program Files\\Git\\bin\\bash.exe",
+        "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+        "bash.exe", // If it's in PATH
+    ];
+    
+    for bash_path in &git_bash_paths {
+        let git_bash_result = Command::new(bash_path)
+            .arg(script_path)
+            .arg(service_name)
+            .arg(project_root)
+            .current_dir(root)
+            .status();
+            
+        if let Ok(status) = git_bash_result {
+            return status;
+        }
+    }
+    
+    // Try WSL as fallback (if available and properly configured)
+    println!("Git Bash not found, trying WSL...");
+    let script_unix_path = format!("/{}", script_path.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
+    let project_root_unix_path = format!("/{}", project_root.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
+    let root_unix_path = format!("/{}", root.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
+    
+    let wsl_result = Command::new("wsl")
+        .arg("bash")
+        .arg("-c")
+        .arg(&format!("cd '{}' && bash '{}' '{}' '{}'", 
+                     root_unix_path,
+                     script_unix_path,
+                     service_name, 
+                     project_root_unix_path))
+        .status();
+    
+    if let Ok(status) = wsl_result {
+        return status;
+    }
+    
+    // Final fallback: PowerShell with WSL
+    println!("WSL direct execution failed, trying PowerShell + WSL...");
+    let ps_command = format!(
+        "wsl bash -c \"cd '{}' && bash '{}' '{}' '{}'\"",
+        root_unix_path,
+        script_unix_path,
+        service_name,
+        project_root_unix_path
+    );
+    
+    let ps_result = Command::new("powershell")
+        .arg("-Command")
+        .arg(&ps_command)
+        .status();
+        
+    match ps_result {
+        Ok(status) => status,
+        Err(_) => {
+            eprintln!("\x1b[31mError:\x1b[0m Failed to execute VPN setup script on Windows.");
+            eprintln!("Please ensure one of the following is available:");
+            eprintln!("  - Git Bash (recommended)");
+            eprintln!("  - WSL (Windows Subsystem for Linux) with bash installed");
+            eprintln!("\nAlternatively, you can run the setup script manually:");
+            eprintln!("  bash \"{}\" {} \"{}\"", script_path.display(), service_name, project_root.display());
+            std::process::exit(1);
+        }
+    }
 }
 
 fn main() {
     let cli = Cli::parse();
     match &cli.command {
-        Commands::Init => {
-            setup_config();
-            return;
-        }
-        Commands::Setup => {
-            setup_torrenting(&resolve_root(cli.root.as_ref()));
+        Commands::Setup { service } => {
+            let root = resolve_root(cli.root.as_ref());
+            setup_project_and_service(&root, service.as_deref());
             return;
         }
         Commands::Status { language } => {
@@ -66,6 +141,14 @@ fn main() {
         }
         Commands::Test { language } => {
             test_functionality(&resolve_root(cli.root.as_ref()), language);
+            return;
+        }
+        Commands::VpnCheck { language } => {
+            check_vpn_connection(&resolve_root(cli.root.as_ref()), language);
+            return;
+        }
+        Commands::KillswitchCheck { language } => {
+            check_killswitch(&resolve_root(cli.root.as_ref()), language);
             return;
         }
         _ => {}
@@ -103,10 +186,11 @@ fn main() {
             run_compose(&root, cli.service.as_deref().unwrap_or(language), language, "down", &args)
         },
         Commands::Logs { language, extra } => run_compose(&root, cli.service.as_deref().unwrap_or(language), language, "logs", extra),
-        Commands::Init => unreachable!(),
-        Commands::Setup => unreachable!(),
+        Commands::Setup { .. } => unreachable!(),
         Commands::Status { .. } => unreachable!(),
         Commands::Test { .. } => unreachable!(),
+        Commands::VpnCheck { .. } => unreachable!(),
+        Commands::KillswitchCheck { .. } => unreachable!(),
     }
 }
 
@@ -128,7 +212,110 @@ fn resolve_root(cli_root: Option<&PathBuf>) -> PathBuf {
     env::current_dir().expect("Failed to get current directory")
 }
 
-fn setup_config() {
+fn setup_project_and_service(root: &PathBuf, service: Option<&str>) {
+    // First, check if project root is properly configured
+    // We need to check if the config file exists and contains a valid path
+    let is_configured = if let Some(home) = dirs::home_dir() {
+        let config_path = home.join(CONFIG_FILE);
+        if let Ok(path) = fs::read_to_string(&config_path) {
+            let trimmed = path.trim();
+            !trimmed.is_empty() && Path::new(trimmed).exists() && Path::new(trimmed).is_dir()
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+    
+    if !is_configured {
+        setup_project_root();
+        // After setup, we need to resolve the root again to get the newly configured path
+        let new_root = resolve_root(None);
+        // Recursively call ourselves with the new root
+        setup_project_and_service(&new_root, service);
+        return;
+    }
+    
+    // If no service specified, just setup project root
+    if service.is_none() {
+        println!("Project root setup complete!");
+        println!("To setup a service, run: doc setup [torrenting|javascript]");
+        return;
+    }
+    
+    let service_name = service.unwrap();
+    
+    // Validate service
+    match service_name {
+        "torrenting" | "javascript" => {},
+        _ => {
+            eprintln!("\x1b[31mError:\x1b[0m Unsupported service: {}. Use 'torrenting' or 'javascript'.", service_name);
+            std::process::exit(1);
+        }
+    }
+    
+    // Check if service directory exists
+    let service_dir = root.join(service_name);
+    if !service_dir.exists() {
+        eprintln!("\x1b[31mError:\x1b[0m Service directory not found: {}", service_dir.display());
+        std::process::exit(1);
+    }
+    
+    println!("Setting up {} service with VPN...", service_name);
+    
+    // Create service data directory
+    let data_dir = service_dir.join("data");
+    if let Err(e) = fs::create_dir_all(&data_dir) {
+        eprintln!("\x1b[31mError:\x1b[0m Failed to create data directory: {}", e);
+        std::process::exit(1);
+    }
+    
+    // Create common VPN config directory
+    let vpn_config_dir = root.join("vpn").join("config");
+    if let Err(e) = fs::create_dir_all(&vpn_config_dir) {
+        eprintln!("\x1b[31mError:\x1b[0m Failed to create VPN config directory: {}", e);
+        std::process::exit(1);
+    }
+    
+    // Run the unified VPN setup script
+    let vpn_setup_script = root.join("vpn").join("scripts").join("setup-vpn.sh");
+    if !vpn_setup_script.exists() {
+        eprintln!("\x1b[31mError:\x1b[0m VPN setup script not found: {}", vpn_setup_script.display());
+        eprintln!("Make sure the vpn directory is present in your project root.");
+        std::process::exit(1);
+    }
+    
+    println!("Running VPN setup script...");
+    
+    // Cross-platform script execution
+    let status = if cfg!(target_os = "windows") {
+        // On Windows, try multiple approaches
+        execute_script_windows(&vpn_setup_script, service_name, root, root)
+    } else {
+        // On Unix-like systems, use bash directly
+        Command::new("bash")
+            .arg(&vpn_setup_script)
+            .arg(service_name)
+            .arg(root)
+            .current_dir(root)
+            .status()
+            .expect("Failed to run VPN setup script")
+    };
+    
+    if !status.success() {
+        eprintln!("\x1b[31mError:\x1b[0m VPN setup failed");
+        std::process::exit(1);
+    }
+    
+    println!("\n✅ {} service setup complete!", service_name);
+    println!("Next steps:");
+    println!("  - doc start {}", service_name);
+    println!("  - doc status {}", service_name);
+    println!("  - doc test {}", service_name);
+}
+
+fn setup_project_root() {
+    println!("Setting up project root...");
     println!("Enter the absolute path to your project root (where language subdirs are):");
     print!("> ");
     io::stdout().flush().unwrap();
@@ -145,204 +332,11 @@ fn setup_config() {
             eprintln!("\x1b[31mError:\x1b[0m Failed to write config: {}", e);
             std::process::exit(1);
         }
-        println!("Saved project root to {}", config_path.display());
+        println!("✅ Project root saved to {}", config_path.display());
     } else {
         eprintln!("\x1b[31mError:\x1b[0m Could not determine home directory.");
         std::process::exit(1);
     }
-}
-
-fn setup_torrenting(root: &PathBuf) {
-    let vpn_dir = root.join("torrenting").join("data").join("vpn");
-    let config_dir = root.join("torrenting").join("data").join("config");
-    let downloads_dir = root.join("torrenting").join("data").join("downloads");
-    
-    // Create directories if they don't exist
-    if let Err(e) = fs::create_dir_all(&vpn_dir) {
-        eprintln!("\x1b[31mError:\x1b[0m Failed to create VPN directory: {}", e);
-        std::process::exit(1);
-    }
-    if let Err(e) = fs::create_dir_all(&config_dir) {
-        eprintln!("\x1b[31mError:\x1b[0m Failed to create config directory: {}", e);
-        std::process::exit(1);
-    }
-    if let Err(e) = fs::create_dir_all(&downloads_dir) {
-        eprintln!("\x1b[31mError:\x1b[0m Failed to create downloads directory: {}", e);
-        std::process::exit(1);
-    }
-    
-    let auth_file = vpn_dir.join("auth.txt");
-    let ovpn_file = vpn_dir.join("nordvpn.ovpn");
-    let password_file = config_dir.join("qbt_password.txt");
-    
-    println!("Torrenting Container Setup");
-    println!("==========================");
-    println!();
-    println!("This will set up:");
-    println!("1. NordVPN OpenVPN configuration file (.ovpn)");
-    println!("2. NordVPN service credentials");
-    println!("3. qBittorrent Web UI password");
-    println!();
-    
-    // Check if OpenVPN config exists
-    if !ovpn_file.exists() {
-        println!("Step 1: NordVPN OpenVPN Configuration");
-        println!("-------------------------------------");
-        println!("OpenVPN configuration not found.");
-        println!();
-        println!("Download your .ovpn file from:");
-        println!("https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/openvpn/");
-        println!();
-        println!("Place it at: {}", ovpn_file.display());
-        println!();
-    } else {
-        println!("Step 1: OpenVPN configuration found: {}", ovpn_file.display());
-        println!();
-    }
-    
-    // Setup VPN auth file
-    if !auth_file.exists() {
-        println!("Step 2: NordVPN Service Credentials");
-        println!("-----------------------------------");
-        println!("Get your service credentials from:");
-        println!("https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/service-credentials/");
-        println!();
-        
-        print!("Service Username: ");
-        io::stdout().flush().unwrap();
-        let mut username = String::new();
-        io::stdin().read_line(&mut username).unwrap();
-        let username = username.trim();
-        
-        if username.is_empty() {
-            eprintln!("\x1b[31mError:\x1b[0m Username cannot be empty");
-            std::process::exit(1);
-        }
-        
-        print!("Service Password: ");
-        io::stdout().flush().unwrap();
-        let mut password = String::new();
-        io::stdin().read_line(&mut password).unwrap();
-        let password = password.trim();
-        
-        if password.is_empty() {
-            eprintln!("\x1b[31mError:\x1b[0m Password cannot be empty");
-            std::process::exit(1);
-        }
-        
-        let auth_content = format!("{}\n{}\n", username, password);
-        
-        if let Err(e) = fs::write(&auth_file, auth_content) {
-            eprintln!("\x1b[31mError:\x1b[0m Failed to write auth file: {}", e);
-            std::process::exit(1);
-        }
-        
-        // Set secure permissions on auth file
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&auth_file).unwrap().permissions();
-            perms.set_mode(0o600);
-            fs::set_permissions(&auth_file, perms).unwrap();
-        }
-        
-        println!("VPN credentials saved to: {}", auth_file.display());
-        println!();
-    } else {
-        println!("Step 2: VPN credentials already configured: {}", auth_file.display());
-        println!();
-    }
-    
-    // Setup qBittorrent password
-    println!("Step 3: qBittorrent Web UI Password");
-    println!("-----------------------------------");
-    
-    if password_file.exists() {
-        let existing_password = fs::read_to_string(&password_file).unwrap_or_default().trim().to_string();
-        println!("Current password file exists: {}", password_file.display());
-        print!("Do you want to change the password? (y/N): ");
-        io::stdout().flush().unwrap();
-        let mut response = String::new();
-        io::stdin().read_line(&mut response).unwrap();
-        
-        if !response.trim().to_lowercase().starts_with('y') {
-            println!("Keeping existing password.");
-            println!("Current password: {}", existing_password);
-            println!();
-        } else {
-            setup_qbt_password(&password_file);
-        }
-    } else {
-        setup_qbt_password(&password_file);
-    }
-    
-    // Summary
-    println!("Setup Summary");
-    println!("=============");
-    if ovpn_file.exists() && auth_file.exists() {
-        println!("All files are ready:");
-        println!("  OpenVPN config: {}", ovpn_file.display());
-        println!("  VPN credentials: {}", auth_file.display());
-        println!("  qBittorrent password: {}", password_file.display());
-        println!("  Downloads directory: {}", downloads_dir.display());
-        println!();
-        println!("Commands:");
-        println!("  Start container: doc start torrenting");
-        println!("  Check status: doc status torrenting");
-        println!("  Run tests: doc test torrenting");
-        println!("  View logs: doc logs torrenting");
-        println!("  Access Web UI: http://localhost:8081");
-        println!();
-        println!("First login credentials: admin / adminadmin");
-        if password_file.exists() {
-            let qbt_password = fs::read_to_string(&password_file).unwrap_or_default().trim().to_string();
-            println!("Then change password to: {}", qbt_password);
-            println!("(Password stored at: {})", password_file.display());
-        }
-    } else {
-        println!("Setup incomplete. You still need to:");
-        if !ovpn_file.exists() {
-            println!("  1. Download your NordVPN .ovpn file");
-            println!("     Place it at: {}", ovpn_file.display());
-        }
-        if !auth_file.exists() {
-            println!("  2. Run this setup command again to configure VPN credentials");
-        }
-        println!();
-        println!("Then run: doc start torrenting");
-    }
-}
-
-fn setup_qbt_password(password_file: &PathBuf) {
-    print!("Enter qBittorrent Web UI password (or press Enter for default 'SecureTorrent2024!'): ");
-    io::stdout().flush().unwrap();
-    let mut qbt_password = String::new();
-    io::stdin().read_line(&mut qbt_password).unwrap();
-    let qbt_password = qbt_password.trim();
-    
-    let final_password = if qbt_password.is_empty() {
-        "SecureTorrent2024!".to_string()
-    } else {
-        qbt_password.to_string()
-    };
-    
-    if let Err(e) = fs::write(&password_file, &final_password) {
-        eprintln!("\x1b[31mError:\x1b[0m Failed to write password file: {}", e);
-        std::process::exit(1);
-    }
-    
-    // Set secure permissions on password file
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&password_file).unwrap().permissions();
-        perms.set_mode(0o600);
-        fs::set_permissions(&password_file, perms).unwrap();
-    }
-    
-    println!("qBittorrent password saved: {}", final_password);
-    println!("Password file: {}", password_file.display());
-    println!();
 }
 
 fn run_compose(root: &PathBuf, service: &str, language: &str, action: &str, extra: &Vec<String>) {
@@ -373,8 +367,9 @@ fn run_compose(root: &PathBuf, service: &str, language: &str, action: &str, extr
 }
 
 fn check_status(root: &PathBuf, language: &str) {
-    if language != "torrenting" {
-        eprintln!("\x1b[31mError:\x1b[0m Status check only available for torrenting language");
+    let supported_services = ["torrenting", "javascript"];
+    if !supported_services.contains(&language) {
+        eprintln!("\x1b[31mError:\x1b[0m Status check only available for: {}", supported_services.join(", "));
         std::process::exit(1);
     }
     
@@ -384,11 +379,12 @@ fn check_status(root: &PathBuf, language: &str) {
         std::process::exit(1);
     }
     
-    println!("Checking torrenting container status...");
+    println!("Checking {} container status...", language);
     
     // Check if container is running
+    let container_name = format!("playground-{}", language);
     let output = Command::new("docker")
-        .args(&["ps", "--filter", "name=playground-torrenting", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"])
+        .args(&["ps", "--filter", &format!("name={}", container_name), "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"])
         .output()
         .expect("Failed to run docker ps");
     
@@ -396,10 +392,10 @@ fn check_status(root: &PathBuf, language: &str) {
     println!("Container Status:");
     println!("{}", status_output);
     
-    if status_output.contains("playground-torrenting") {
+    if status_output.contains(&container_name) {
         println!("\nRunning health check...");
         let health_output = Command::new("docker")
-            .args(&["exec", "playground-torrenting", "/usr/local/bin/health-check.sh"])
+            .args(&["exec", &container_name, "/usr/local/bin/health-check.sh", language])
             .output();
             
         match health_output {
@@ -414,27 +410,30 @@ fn check_status(root: &PathBuf, language: &str) {
             Err(e) => println!("Failed to run health check: {}", e),
         }
     } else {
-        println!("Container is not running. Start it with: doc start torrenting");
+        println!("Container is not running. Start it with: doc start {}", language);
     }
 }
 
 fn test_functionality(root: &PathBuf, language: &str) {
-    if language != "torrenting" {
-        eprintln!("\x1b[31mError:\x1b[0m Test functionality only available for torrenting language");
+    let supported_services = ["torrenting", "javascript"];
+    if !supported_services.contains(&language) {
+        eprintln!("\x1b[31mError:\x1b[0m Test functionality only available for: {}", supported_services.join(", "));
         std::process::exit(1);
     }
     
-    println!("Testing torrenting functionality...");
+    println!("Testing {} functionality...", language);
+    
+    let container_name = format!("playground-{}", language);
     
     // Test 1: Check if container is running
     println!("\n1. Checking if container is running...");
     let output = Command::new("docker")
-        .args(&["ps", "-q", "--filter", "name=playground-torrenting"])
+        .args(&["ps", "-q", "--filter", &format!("name={}", container_name)])
         .output()
         .expect("Failed to run docker ps");
     
     if output.stdout.is_empty() {
-        println!("❌ Container is not running. Start it with: doc start torrenting");
+        println!("❌ Container is not running. Start it with: doc start {}", language);
         return;
     }
     println!("✅ Container is running");
@@ -442,7 +441,7 @@ fn test_functionality(root: &PathBuf, language: &str) {
     // Test 2: Check VPN connection
     println!("\n2. Testing VPN connection...");
     let vpn_test = Command::new("docker")
-        .args(&["exec", "playground-torrenting", "ip", "route", "show", "table", "main"])
+        .args(&["exec", &container_name, "ip", "route", "show", "table", "main"])
         .output();
     
     match vpn_test {
@@ -461,7 +460,7 @@ fn test_functionality(root: &PathBuf, language: &str) {
     // Test 3: Check external IP
     println!("\n3. Testing external IP through VPN...");
     let ip_test = Command::new("docker")
-        .args(&["exec", "playground-torrenting", "curl", "-s", "--max-time", "10", "--interface", "tun0", "https://httpbin.org/ip"])
+        .args(&["exec", &container_name, "curl", "-s", "--max-time", "10", "--interface", "tun0", "https://httpbin.org/ip"])
         .output();
     
     match ip_test {
@@ -476,41 +475,211 @@ fn test_functionality(root: &PathBuf, language: &str) {
         Err(e) => println!("❌ Failed to test external IP: {}", e),
     }
     
-    // Test 4: Check qBittorrent Web UI
-    println!("\n4. Testing qBittorrent Web UI...");
-    let ui_test = Command::new("curl")
-        .args(&["-s", "--max-time", "5", "http://localhost:8081"])
-        .output();
-    
-    match ui_test {
-        Ok(output) => {
-            if output.status.success() {
-                println!("✅ qBittorrent Web UI is accessible at http://localhost:8081");
+    // Service-specific tests
+    match language {
+        "torrenting" => {
+            // Test 4: Check qBittorrent Web UI
+            println!("\n4. Testing qBittorrent Web UI...");
+            let ui_test = Command::new("curl")
+                .args(&["-s", "--max-time", "5", "http://localhost:8081"])
+                .output();
+            
+            match ui_test {
+                Ok(output) => {
+                    if output.status.success() {
+                        println!("✅ qBittorrent Web UI is accessible at http://localhost:8081");
+                    } else {
+                        println!("❌ qBittorrent Web UI is not accessible");
+                    }
+                },
+                Err(e) => println!("❌ Failed to test Web UI: {}", e),
+            }
+            
+            // Test 5: Check download directory
+            println!("\n5. Checking download directory...");
+            let downloads_dir = root.join("torrenting").join("data").join("downloads");
+            if downloads_dir.exists() {
+                println!("✅ Downloads directory exists: {}", downloads_dir.display());
+                match fs::metadata(&downloads_dir) {
+                    Ok(metadata) => {
+                        if metadata.is_dir() {
+                            println!("✅ Downloads directory is accessible");
+                        } else {
+                            println!("❌ Downloads path is not a directory");
+                        }
+                    },
+                    Err(e) => println!("❌ Failed to check downloads directory: {}", e),
+                }
             } else {
-                println!("❌ qBittorrent Web UI is not accessible");
+                println!("❌ Downloads directory not found: {}", downloads_dir.display());
             }
         },
-        Err(e) => println!("❌ Failed to test Web UI: {}", e),
-    }
-    
-    // Test 5: Check download directory
-    println!("\n5. Checking download directory...");
-    let downloads_dir = root.join("torrenting").join("data").join("downloads");
-    if downloads_dir.exists() {
-        println!("✅ Downloads directory exists: {}", downloads_dir.display());
-        match fs::metadata(&downloads_dir) {
-            Ok(metadata) => {
-                if metadata.is_dir() {
-                    println!("✅ Downloads directory is accessible");
-                } else {
-                    println!("❌ Downloads path is not a directory");
+        "javascript" => {
+            // Test 4: Check development ports
+            println!("\n4. Testing development server ports...");
+            let ports = [3000, 5173, 8080];
+            let mut accessible_ports = Vec::new();
+            
+            for port in ports {
+                let port_test = Command::new("curl")
+                    .args(&["-s", "--max-time", "3", &format!("http://localhost:{}", port)])
+                    .output();
+                
+                if let Ok(output) = port_test {
+                    if output.status.success() {
+                        accessible_ports.push(port);
+                    }
                 }
-            },
-            Err(e) => println!("❌ Failed to check downloads directory: {}", e),
-        }
-    } else {
-        println!("❌ Downloads directory not found: {}", downloads_dir.display());
+            }
+            
+            if accessible_ports.is_empty() {
+                println!("ℹ️  No development servers currently running");
+            } else {
+                println!("✅ Development servers accessible on ports: {:?}", accessible_ports);
+            }
+            
+            // Test 5: Check project directory
+            println!("\n5. Checking project directory...");
+            let projects_dir = root.join("javascript").join("data").join("projects");
+            if projects_dir.exists() {
+                println!("✅ Projects directory exists: {}", projects_dir.display());
+            } else {
+                println!("ℹ️  Projects directory not found (will be created on first use)");
+            }
+        },
+        _ => {}
     }
     
-    println!("\nTest complete! If all tests pass, your torrenting setup should be working correctly.");
+    println!("\nTest complete! If all tests pass, your {} setup should be working correctly.", language);
+}
+
+fn check_vpn_connection(_root: &PathBuf, language: &str) {
+    let supported_services = ["torrenting", "javascript"];
+    if !supported_services.contains(&language) {
+        eprintln!("\x1b[31mError:\x1b[0m VPN check only available for: {}", supported_services.join(", "));
+        std::process::exit(1);
+    }
+    
+    println!("Checking VPN connection for {} service...", language);
+    
+    let container_name = format!("playground-{}", language);
+    
+    // Check if container is running
+    let output = Command::new("docker")
+        .args(&["ps", "-q", "--filter", &format!("name={}", container_name)])
+        .output()
+        .expect("Failed to run docker ps");
+    
+    if output.stdout.is_empty() {
+        println!("❌ Container is not running. Start it with: doc start {}", language);
+        return;
+    }
+    
+    // Run health check
+    let health_output = Command::new("docker")
+        .args(&["exec", &container_name, "/usr/local/bin/health-check.sh", language])
+        .output();
+        
+    match health_output {
+        Ok(output) => {
+            let health_result = String::from_utf8_lossy(&output.stdout);
+            println!("{}", health_result);
+            if !output.status.success() {
+                let error_result = String::from_utf8_lossy(&output.stderr);
+                println!("VPN check errors: {}", error_result);
+                std::process::exit(1);
+            }
+        },
+        Err(e) => {
+            println!("❌ Failed to run VPN check: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn check_killswitch(_root: &PathBuf, language: &str) {
+    let supported_services = ["torrenting", "javascript"];
+    if !supported_services.contains(&language) {
+        eprintln!("\x1b[31mError:\x1b[0m Killswitch check only available for: {}", supported_services.join(", "));
+        std::process::exit(1);
+    }
+    
+    println!("Checking killswitch configuration for {} service...", language);
+    
+    let container_name = format!("playground-{}", language);
+    
+    // Check if container is running
+    let output = Command::new("docker")
+        .args(&["ps", "-q", "--filter", &format!("name={}", container_name)])
+        .output()
+        .expect("Failed to run docker ps");
+    
+    if output.stdout.is_empty() {
+        println!("❌ Container is not running. Start it with: doc start {}", language);
+        return;
+    }
+    
+    // Check iptables rules
+    println!("Checking iptables rules...");
+    let iptables_output = Command::new("docker")
+        .args(&["exec", &container_name, "iptables", "-L", "-n", "-v"])
+        .output();
+        
+    match iptables_output {
+        Ok(output) => {
+            let rules = String::from_utf8_lossy(&output.stdout);
+            
+            // Check for key killswitch indicators
+            let has_drop_policy = rules.contains("policy DROP");
+            let has_tun_rules = rules.contains("tun");
+            let has_vpn_rules = rules.contains("1194") || rules.contains("443");
+            
+            if has_drop_policy {
+                println!("✅ Default DROP policy is active");
+            } else {
+                println!("❌ Default DROP policy not found");
+            }
+            
+            if has_tun_rules {
+                println!("✅ VPN tunnel interface rules are configured");
+            } else {
+                println!("❌ VPN tunnel interface rules not found");
+            }
+            
+            if has_vpn_rules {
+                println!("✅ VPN connection rules are configured");
+            } else {
+                println!("❌ VPN connection rules not found");
+            }
+            
+            // Test that traffic is blocked without VPN
+            println!("\nTesting traffic blocking without VPN interface...");
+            let leak_test = Command::new("docker")
+                .args(&["exec", &container_name, "bash", "-c", "timeout 5 curl -s --interface eth0 https://httpbin.org/ip 2>/dev/null || echo 'BLOCKED'"])
+                .output();
+                
+            match leak_test {
+                Ok(output) => {
+                    let result = String::from_utf8_lossy(&output.stdout);
+                    if result.contains("BLOCKED") || result.trim().is_empty() {
+                        println!("✅ Traffic properly blocked without VPN");
+                    } else {
+                        println!("❌ Traffic leakage detected: {}", result);
+                    }
+                },
+                Err(e) => println!("❌ Failed to test traffic blocking: {}", e),
+            }
+            
+            if has_drop_policy && has_tun_rules && has_vpn_rules {
+                println!("\n✅ Killswitch is properly configured");
+            } else {
+                println!("\n❌ Killswitch configuration issues detected");
+                std::process::exit(1);
+            }
+        },
+        Err(e) => {
+            println!("❌ Failed to check iptables rules: {}", e);
+            std::process::exit(1);
+        }
+    }
 }

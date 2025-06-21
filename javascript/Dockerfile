@@ -1,9 +1,7 @@
 FROM ubuntu:22.04
 
-# Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update package list and install essential tools + VPN dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -23,52 +21,50 @@ RUN apt-get update && apt-get install -y \
     dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user for safety (password: lavik)
 RUN useradd -m -d /home -s /bin/bash playground && \
     echo "playground:lavik" | chpasswd && \
     usermod -aG sudo playground
 
-# Create VPN and data directories
 RUN mkdir -p /etc/openvpn/nordvpn /home/data && \
     chown -R playground:playground /home/data
 
-# Set up a working directory
 WORKDIR /home
 RUN chown playground:playground /home
 
-# Copy shared VPN scripts and service-specific scripts
-COPY docker/common/scripts/killswitch.sh /usr/local/bin/killswitch.sh
-COPY docker/common/scripts/health-check.sh /usr/local/bin/health-check.sh
-COPY docker/common/scripts/start-vpn-base.sh /usr/local/bin/start-vpn-base.sh
-COPY docker/common/scripts/start-vpn-javascript.sh /usr/local/bin/start-vpn.sh
-RUN dos2unix /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn-base.sh /usr/local/bin/start-vpn.sh && \
-    chmod +x /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn-base.sh /usr/local/bin/start-vpn.sh
+# Copy centralized VPN scripts
+COPY vpn/scripts/killswitch.sh /usr/local/bin/killswitch.sh
+COPY vpn/scripts/health-check.sh /usr/local/bin/health-check.sh
+COPY vpn/scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
+RUN dos2unix /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn.sh && \
+    chmod +x /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn.sh
 
-# Switch to non-root user
-USER playground
+# Copy entrypoint script that handles VPN setup as root, then switches to playground user
+COPY javascript/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Set up some useful aliases and environment
-RUN echo 'alias ll="ls -la"' >> ~/.bashrc && \
-    echo 'alias la="ls -A"' >> ~/.bashrc && \
-    echo 'alias s="git status"' >> ~/.bashrc && \
-    echo 'alias p="git push"' >> ~/.bashrc && \
-    echo 'alias pl="git pull"' >> ~/.bashrc && \
-    echo 'alias aa="git add --all"' >> ~/.bashrc && \
-    echo 'alias ..="cd .."' >> ~/.bashrc && \
-    echo 'alias ...="cd ../.."' >> ~/.bashrc && \
-    echo 'export PS1="\[\033[01;32m\]playground@container\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "' >> ~/.bashrc && \
-    echo '' >> ~/.bashrc && \
-    echo '# Git functions that take parameters' >> ~/.bashrc && \
-    echo 'function b() { git checkout "$1"; }' >> ~/.bashrc && \
-    echo 'function c() { git commit -m "$*"; }' >> ~/.bashrc && \
-    echo 'function a() { git add "$@"; }' >> ~/.bashrc
+# Set up playground user environment (must be done as root before switching)
+RUN echo 'alias ll="ls -la"' >> /home/.bashrc && \
+    echo 'alias la="ls -A"' >> /home/.bashrc && \
+    echo 'alias s="git status"' >> /home/.bashrc && \
+    echo 'alias p="git push"' >> /home/.bashrc && \
+    echo 'alias pl="git pull"' >> /home/.bashrc && \
+    echo 'alias aa="git add --all"' >> /home/.bashrc && \
+    echo 'alias ..="cd .."' >> /home/.bashrc && \
+    echo 'alias ...="cd ../.."' >> /home/.bashrc && \
+    echo 'export PS1="\[\033[01;32m\]playground@container\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "' >> /home/.bashrc && \
+    echo '' >> /home/.bashrc && \
+    echo '# Git functions that take parameters' >> /home/.bashrc && \
+    echo 'function b() { git checkout "$1"; }' >> /home/.bashrc && \
+    echo 'function c() { git commit -m "$*"; }' >> /home/.bashrc && \
+    echo 'function a() { git add "$@"; }' >> /home/.bashrc && \
+    chown playground:playground /home/.bashrc
 
-# Install bun
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="~/.bun/bin:$PATH"
+# Install bun for playground user
+RUN su - playground -c 'curl -fsSL https://bun.sh/install | bash'
+ENV PATH="/home/.bun/bin:$PATH"
 
-# Default command - start VPN and development environment
-CMD ["/usr/local/bin/start-vpn.sh"]
+# Default command - use new entrypoint that handles VPN setup as root, then switches to playground user
+CMD ["/usr/local/bin/entrypoint.sh", "javascript"]
 
 # Expose a port for potential web applications
 EXPOSE 8080
