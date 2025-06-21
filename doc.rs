@@ -56,7 +56,7 @@ enum Commands {
 }
 
 #[cfg(target_os = "windows")]
-fn execute_script_windows(script_path: &PathBuf, service_name: &str, data_dir: &PathBuf, root: &PathBuf) -> std::process::ExitStatus {
+fn execute_script_windows(script_path: &PathBuf, service_name: &str, project_root: &PathBuf, root: &PathBuf) -> std::process::ExitStatus {
     // Try Git Bash first (most reliable on Windows)
     println!("Attempting to run script via Git Bash...");
     let git_bash_paths = [
@@ -69,7 +69,7 @@ fn execute_script_windows(script_path: &PathBuf, service_name: &str, data_dir: &
         let git_bash_result = Command::new(bash_path)
             .arg(script_path)
             .arg(service_name)
-            .arg(data_dir)
+            .arg(project_root)
             .current_dir(root)
             .status();
             
@@ -81,7 +81,7 @@ fn execute_script_windows(script_path: &PathBuf, service_name: &str, data_dir: &
     // Try WSL as fallback (if available and properly configured)
     println!("Git Bash not found, trying WSL...");
     let script_unix_path = format!("/{}", script_path.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
-    let data_unix_path = format!("/{}", data_dir.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
+    let project_root_unix_path = format!("/{}", project_root.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
     let root_unix_path = format!("/{}", root.to_string_lossy().replace(":\\", "/").replace("\\", "/"));
     
     let wsl_result = Command::new("wsl")
@@ -91,7 +91,7 @@ fn execute_script_windows(script_path: &PathBuf, service_name: &str, data_dir: &
                      root_unix_path,
                      script_unix_path,
                      service_name, 
-                     data_unix_path))
+                     project_root_unix_path))
         .status();
     
     if let Ok(status) = wsl_result {
@@ -105,7 +105,7 @@ fn execute_script_windows(script_path: &PathBuf, service_name: &str, data_dir: &
         root_unix_path,
         script_unix_path,
         service_name,
-        data_unix_path
+        project_root_unix_path
     );
     
     let ps_result = Command::new("powershell")
@@ -121,7 +121,7 @@ fn execute_script_windows(script_path: &PathBuf, service_name: &str, data_dir: &
             eprintln!("  - Git Bash (recommended)");
             eprintln!("  - WSL (Windows Subsystem for Linux) with bash installed");
             eprintln!("\nAlternatively, you can run the setup script manually:");
-            eprintln!("  bash \"{}\" {} \"{}\"", script_path.display(), service_name, data_dir.display());
+            eprintln!("  bash \"{}\" {} \"{}\"", script_path.display(), service_name, project_root.display());
             std::process::exit(1);
         }
     }
@@ -270,6 +270,13 @@ fn setup_project_and_service(root: &PathBuf, service: Option<&str>) {
         std::process::exit(1);
     }
     
+    // Create common VPN config directory
+    let vpn_config_dir = root.join("vpn").join("config");
+    if let Err(e) = fs::create_dir_all(&vpn_config_dir) {
+        eprintln!("\x1b[31mError:\x1b[0m Failed to create VPN config directory: {}", e);
+        std::process::exit(1);
+    }
+    
     // Run the unified VPN setup script
     let vpn_setup_script = root.join("vpn").join("scripts").join("setup-vpn.sh");
     if !vpn_setup_script.exists() {
@@ -283,13 +290,13 @@ fn setup_project_and_service(root: &PathBuf, service: Option<&str>) {
     // Cross-platform script execution
     let status = if cfg!(target_os = "windows") {
         // On Windows, try multiple approaches
-        execute_script_windows(&vpn_setup_script, service_name, &data_dir, root)
+        execute_script_windows(&vpn_setup_script, service_name, root, root)
     } else {
         // On Unix-like systems, use bash directly
         Command::new("bash")
             .arg(&vpn_setup_script)
             .arg(service_name)
-            .arg(&data_dir)
+            .arg(root)
             .current_dir(root)
             .status()
             .expect("Failed to run VPN setup script")

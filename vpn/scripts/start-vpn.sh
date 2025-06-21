@@ -128,12 +128,31 @@ if ! verify_openvpn_process; then
     exit 1
 fi
 
-# Fix DNS configuration to use external DNS servers instead of Docker's embedded DNS
+# Fix DNS configuration to use external DNS servers while preserving Docker's embedded DNS
 # This needs to happen BEFORE connectivity testing
 echo "🔧 Configuring DNS for VPN compatibility..."
-echo "nameserver 8.8.8.8" > /etc/resolv.conf
-echo "nameserver 8.8.4.4" >> /etc/resolv.conf
-echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
+# Backup original resolv.conf
+cp /etc/resolv.conf /etc/resolv.conf.backup
+
+# Check if Docker's embedded DNS (127.0.0.11) is present
+if grep -q "127.0.0.11" /etc/resolv.conf.backup; then
+    echo "Preserving Docker's embedded DNS and adding external fallbacks..."
+    # Keep Docker DNS first, add external DNS as fallbacks
+    {
+        grep "nameserver 127.0.0.11" /etc/resolv.conf.backup
+        echo "nameserver 8.8.8.8"
+        echo "nameserver 8.8.4.4" 
+        echo "nameserver 1.1.1.1"
+        # Preserve any other non-127.0.0.11 nameservers from original
+        grep "nameserver" /etc/resolv.conf.backup | grep -v "127.0.0.11" | grep -v "8.8.8.8" | grep -v "8.8.4.4" | grep -v "1.1.1.1" || true
+    } > /etc/resolv.conf
+else
+    echo "No Docker DNS detected, using external DNS servers..."
+    echo "nameserver 8.8.8.8" > /etc/resolv.conf
+    echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+fi
 
 echo "Waiting for VPN connection (timeout: ${VPN_TIMEOUT}s)..."
 

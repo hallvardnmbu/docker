@@ -32,9 +32,9 @@ WORKDIR /home
 RUN chown playground:playground /home
 
 # Copy centralized VPN scripts
-COPY ../vpn/scripts/killswitch.sh /usr/local/bin/killswitch.sh
-COPY ../vpn/scripts/health-check.sh /usr/local/bin/health-check.sh
-COPY ../vpn/scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
+COPY vpn/scripts/killswitch.sh /usr/local/bin/killswitch.sh
+COPY vpn/scripts/health-check.sh /usr/local/bin/health-check.sh
+COPY vpn/scripts/start-vpn.sh /usr/local/bin/start-vpn.sh
 RUN dos2unix /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn.sh && \
     chmod +x /usr/local/bin/killswitch.sh /usr/local/bin/health-check.sh /usr/local/bin/start-vpn.sh
 

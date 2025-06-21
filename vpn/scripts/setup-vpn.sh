@@ -1,19 +1,19 @@
 #!/bin/bash
 
 # Unified VPN setup script
-# Usage: setup-vpn.sh [SERVICE_TYPE] [DATA_DIR]
+# Usage: setup-vpn.sh [SERVICE_TYPE] [PROJECT_ROOT]
 # SERVICE_TYPE: torrenting, javascript, or default
-# DATA_DIR: Directory where VPN config will be stored
+# PROJECT_ROOT: Project root directory (for common VPN config)
 
 SERVICE_TYPE=${1:-default}
-DATA_DIR=${2:-data}
+PROJECT_ROOT=${2:-$(pwd)}
 
 echo "🛡️  ${SERVICE_TYPE^} Container VPN Setup"
 
-# Create VPN directory if it doesn't exist
-VPN_DIR="${DATA_DIR}/vpn"
+# Create common VPN directory if it doesn't exist
+VPN_DIR="${PROJECT_ROOT}/vpn/config"
 if [ ! -d "${VPN_DIR}" ]; then
-    echo "Creating VPN configuration directory..."
+    echo "Creating common VPN configuration directory..."
     mkdir -p "${VPN_DIR}"
 fi
 
@@ -63,10 +63,11 @@ fi
 case "${SERVICE_TYPE}" in
     "torrenting")
         # Create additional directories for torrenting
-        mkdir -p "${DATA_DIR}/config" "${DATA_DIR}/downloads"
+        SERVICE_DATA_DIR="${PROJECT_ROOT}/torrenting/data"
+        mkdir -p "${SERVICE_DATA_DIR}/config" "${SERVICE_DATA_DIR}/downloads"
         
         # Setup qBittorrent password if needed
-        QBT_PASSWORD_FILE="${DATA_DIR}/config/qbt_password.txt"
+        QBT_PASSWORD_FILE="${SERVICE_DATA_DIR}/config/qbt_password.txt"
         if [ ! -f "${QBT_PASSWORD_FILE}" ]; then
             echo ""
             echo "📝 Setting up qBittorrent Web UI password..."
@@ -81,7 +82,8 @@ case "${SERVICE_TYPE}" in
         ;;
     "javascript")
         # Create additional directories for javascript development
-        mkdir -p "${DATA_DIR}/projects" "${DATA_DIR}/node_modules"
+        SERVICE_DATA_DIR="${PROJECT_ROOT}/javascript/data"
+        mkdir -p "${SERVICE_DATA_DIR}/projects" "${SERVICE_DATA_DIR}/node_modules"
         echo "✅ JavaScript development directories created"
         ;;
 esac
@@ -94,7 +96,7 @@ if [ -f "${OVPN_FILE}" ] && [ -f "${AUTH_FILE}" ]; then
     echo "📋 Setup Summary:"
     echo "   VPN Config: ${OVPN_FILE}"
     echo "   VPN Auth: ${AUTH_FILE}"
-    echo "   Data Directory: ${DATA_DIR}"
+    echo "   Common VPN Directory: ${VPN_DIR}"
     echo ""
     echo "🚀 Next steps:"
     echo "   Start container: doc start ${SERVICE_TYPE}"

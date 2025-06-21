@@ -54,7 +54,10 @@ iptables -A INPUT -i eth0 -j REJECT --reject-with icmp-net-unreachable
 case "${SERVICE_TYPE}" in
     "torrenting")
         echo "Configuring nuclear killswitch for torrenting service..."
+        # Allow WebUI access from Docker network and host machine
         iptables -A INPUT -p tcp --dport 8081 -s ${DOCKER_SUBNET} -j ACCEPT
+        # Allow WebUI access from Docker host (Windows)
+        iptables -A INPUT -p tcp --dport 8081 -i eth0 -j ACCEPT
         ;;
     "javascript")
         echo "Configuring nuclear killswitch for JavaScript development service..."
