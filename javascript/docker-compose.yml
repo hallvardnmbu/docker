@@ -1,6 +1,8 @@
 services:
   javascript:
-    build: .
+    build:
+      context: ..
+      dockerfile: javascript/Dockerfile
     container_name: playground-javascript
     privileged: true
     stdin_open: true
@@ -15,7 +17,7 @@ services:
       - ../../snublejuice:/home/snublejuice
       
       # VPN configuration mount
-      - ./data/vpn:/etc/openvpn/nordvpn
+      - ../vpn/config:/etc/openvpn/nordvpn
       
       # Temporary filesystem for /tmp
       - type: tmpfs
@@ -28,6 +30,7 @@ services:
       - TZ=UTC
       - PUID=1000
       - PGID=1000
+      - SERVICE_TYPE=javascript
     # Resource limits for safety
     deploy:
       resources:
@@ -55,18 +58,13 @@ services:
       timeout: 30s
       retries: 3
       start_period: 2m
-    # Read-only root filesystem (optional - uncomment if you want extra isolation)
-    # read_only: true
-    # tmpfs:
-    #   - /tmp
-    #   - /var/tmp
-
+      
 networks:
   playground-net:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.25.0.0/16
+        - subnet: 172.26.0.0/16
 
 # Define named volumes
 volumes:
