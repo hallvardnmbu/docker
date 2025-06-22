@@ -8,6 +8,7 @@
 **/Cargo.lock
 
 torrenting/data/*
+vpn-config/*
 auth.*
 *.ovpn
 *.txt
