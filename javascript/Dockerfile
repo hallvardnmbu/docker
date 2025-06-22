@@ -25,7 +25,7 @@ RUN chown playground:playground /home
 # Set custom prompt
 RUN touch /home/.bashrc && \
     chown playground:playground /home/.bashrc && \
-    echo 'export PS1="\[\033[01;32m\]jsavascript@gluetun\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "' >> /home/.bashrc
+    echo 'export PS1="\[\033[01;32m\]javascript@gluetun\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "' >> /home/.bashrc
 
 # Switch to playground user (no root VPN setup needed)
 USER playground
