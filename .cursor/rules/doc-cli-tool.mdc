@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+For executing and handling docker and docker-compose, ALWAYS use the available `doc` CLI tool (its source found in `doc.rs`, and the executable in `target/release/`).
+
+
+If it's not up-to-date with recent changes, modify it to be so, and re-build the binary from the root directory; `cargo build --release`.

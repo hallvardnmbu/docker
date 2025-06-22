@@ -1,3 +1,5 @@
+.env
+
 **/.Dockerfile.*
 **/Dockerfile~
 **/data/
@@ -6,6 +8,7 @@
 **/Cargo.lock
 
 torrenting/data/*
+vpn-config/*
 auth.*
 *.ovpn
 *.txt
