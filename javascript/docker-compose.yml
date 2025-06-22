@@ -1,74 +1,55 @@
 services:
+  # VPN Container - handles all VPN connectivity
+  vpn:
+    image: qmcgaw/gluetun
+    container_name: playground-vpn-javascript
+    cap_add:
+      - NET_ADMIN
+    environment:
+      # NordVPN configuration
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=${NORDVPN_USER}
+      - OPENVPN_PASSWORD=${NORDVPN_PASSWORD}
+      - SERVER_COUNTRIES=${NORDVPN_COUNTRY}
+      
+      # Kill switch (enabled by default)
+      - FIREWALL=on
+      - FIREWALL_VPN_INPUT_PORTS=8080
+      
+      # Health check
+      - HEALTH_VPN_DURATION_INITIAL=30s
+      - HEALTH_VPN_DURATION_ADDITION=5s
+      
+    ports:
+      # Development server ports
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    networks:
+      - javascript-net
+
+  # Development Environment - routes through VPN container
   javascript:
     build:
-      context: ..
-      dockerfile: javascript/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: playground-javascript
-    privileged: true
-    stdin_open: true
-    tty: true
-    ports:
-      - "127.0.0.1:8080:8080"
-      - "127.0.0.1:3000:3000"
-      - "127.0.0.1:5173:5173"
-    volumes:
-      # Bind mount to local directory
-      - ./data:/home/data
-      - ../../snublejuice:/home/snublejuice
-      
-      # VPN configuration mount
-      - ../vpn/config:/etc/openvpn/nordvpn
-      
-      # Temporary filesystem for /tmp
-      - type: tmpfs
-        target: /tmp
-        tmpfs:
-          size: 100M
-    networks:
-      - playground-net
+    # Route ALL traffic through VPN container
+    network_mode: "service:vpn"
+    depends_on:
+      - vpn
     environment:
       - TZ=UTC
       - PUID=1000
       - PGID=1000
-      - SERVICE_TYPE=javascript
-    # Resource limits for safety
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: '4.0'
-    # Security options - modified for VPN requirements
-    security_opt:
-      - no-new-privileges:true
-    # Capabilities needed for VPN
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-      - CHOWN
-      - DAC_OVERRIDE
-      - FOWNER
-      - SETGID
-      - SETUID
+    volumes:
+      # Project directories
+      - ./data:/home/data
+      - ../../snublejuice:/home/snublejuice
+    stdin_open: true
+    tty: true
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "/usr/local/bin/health-check.sh"]
-      interval: 5m
-      timeout: 30s
-      retries: 3
-      start_period: 2m
-      
-networks:
-  playground-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.26.0.0/16
 
-# Define named volumes
-volumes:
-  playground-data:
-    driver: local
-  playground-projects:
-    driver: local
+networks:
+  javascript-net:
+    driver: bridge
