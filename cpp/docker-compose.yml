@@ -1,19 +1,14 @@
 services:
-  pyjs:
+  cpp:
     build: .
-    container_name: playground-pyjs
+    container_name: playground-cpp
     stdin_open: true
     tty: true
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
-      # Named volume (managed by Docker)
-      # - data:/home/data
-      
       # Bind mount to local directory
-      - ./data:/home/data
-      - ../../snublejuice:/home/snublejuice
-      - ../../ord:/home/ord
+      - ../../cpp:/home/cpp
 
       # Temporary filesystem for /tmp
       - type: tmpfs
@@ -21,7 +16,7 @@ services:
         tmpfs:
           size: 100M
     networks:
-      - pyjs-net
+      - cpp-net
     # Resource limits for safety
     deploy:
       resources:
@@ -47,11 +42,11 @@ services:
     #   - /var/tmp
 
 networks:
-  pyjs-net:
+  cpp-net:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.27.0.0/16
+        - subnet: 172.28.0.0/16
 
 # Define named volumes
 volumes:

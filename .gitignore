@@ -7,8 +7,7 @@
 **/target/
 **/Cargo.lock
 
-torrenting/data/*
-vpn-config/*
+**/vpn-config
 auth.*
 *.ovpn
 *.txt

@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     zip \
     build-essential \
+    gdb \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
@@ -44,10 +45,6 @@ RUN echo 'alias ll="ls -la"' >> ~/.bashrc && \
     echo 'function b() { git checkout "$1"; }' >> ~/.bashrc && \
     echo 'function c() { git commit -m "$*"; }' >> ~/.bashrc && \
     echo 'function a() { git add "$@"; }' >> ~/.bashrc
-
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="~/.local/bin/:$PATH"
 
 # Default command
 CMD ["/bin/bash"]

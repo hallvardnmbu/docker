@@ -53,4 +53,4 @@ RUN echo 'source ~/.cargo/env' >> ~/.bashrc
 CMD ["/bin/bash"]
 
 # Expose a port for potential web applications
-EXPOSE 8080
+EXPOSE 3000

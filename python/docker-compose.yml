@@ -21,7 +21,7 @@ services:
         tmpfs:
           size: 100M
     networks:
-      - playground-net
+      - python-net
     # Resource limits for safety
     deploy:
       resources:
@@ -47,7 +47,7 @@ services:
     #   - /var/tmp
 
 networks:
-  playground-net:
+  python-net:
     driver: bridge
     ipam:
       config:

@@ -57,4 +57,4 @@ ENV PATH="~/.bun/bin:$PATH"
 CMD ["/bin/bash"]
 
 # Expose a port for potential web applications
-EXPOSE 8080
+EXPOSE 3000

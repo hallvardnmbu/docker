@@ -32,3 +32,6 @@ USER playground
 
 # Simple entrypoint - just keep container running
 CMD ["bash"]
+
+# Expose a port for potential web applications
+EXPOSE 8080
