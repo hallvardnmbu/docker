@@ -1,0 +1,23 @@
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565/tcp"
+    environment:
+      EULA: "TRUE"
+      ENABLE_AUTOSTOP: "TRUE"
+      MOTD: "Snublejuice"
+      WHITELIST: |
+        Hallvard
+        Halli
+      MAX_MEMORY: "2G"
+      TZ: "CEST"
+      VERSION: "latest"
+      DIFFICULTY: "normal"
+      MAX_PLAYERS: "6"
+    volumes:
+      - ../../../Minecraft/snublejuice:/data
+    restart: "no"
