@@ -8,6 +8,8 @@ services:
       - "25565:25565/tcp"
     environment:
       EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: 1.21.8
       MOTD: "Snublejuice"
       WHITELIST: |
         Hallvard
@@ -18,9 +20,8 @@ services:
         Cella555
       MAX_MEMORY: "2G"
       TZ: "CEST"
-      VERSION: "latest"
       DIFFICULTY: "normal"
-      MAX_PLAYERS: "6"
+      MAX_PLAYERS: "8"
     volumes:
       - ../../../Minecraft/snublejuice:/data
     restart: "unless-stopped"
