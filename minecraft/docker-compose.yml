@@ -8,11 +8,14 @@ services:
       - "25565:25565/tcp"
     environment:
       EULA: "TRUE"
-      ENABLE_AUTOSTOP: "TRUE"
       MOTD: "Snublejuice"
       WHITELIST: |
         Hallvard
         Halli
+        FishbollKing
+        chicken_boss10
+        Bokaiii
+        Cella555
       MAX_MEMORY: "2G"
       TZ: "CEST"
       VERSION: "latest"
@@ -20,4 +23,4 @@ services:
       MAX_PLAYERS: "6"
     volumes:
       - ../../../Minecraft/snublejuice:/data
-    restart: "no"
+    restart: "unless-stopped"
