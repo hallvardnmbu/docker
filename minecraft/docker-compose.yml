@@ -7,10 +7,12 @@ services:
     ports:
       - "25565:25565/tcp"
     environment:
-      EULA: "TRUE"
+      EULA: TRUE
       TYPE: PAPER
-      VERSION: 1.21.8
+      VERSION: LATEST
       MOTD: "Snublejuice"
+      OVERRIDE_ICON: TRUE
+      ICON: "https://raw.githubusercontent.com/hallvardnmbu/snublejuice/main/src/public/images/64x64.png"
       WHITELIST: |
         Hallvard
         Halli
@@ -18,10 +20,13 @@ services:
         chicken_boss10
         Bokaiii
         Cella555
-      MAX_MEMORY: "2G"
-      TZ: "CEST"
-      DIFFICULTY: "normal"
-      MAX_PLAYERS: "8"
+      MAX_MEMORY: 2G
+      TZ: CEST
+      DIFFICULTY: normal
+      MAX_PLAYERS: 8
+      SPAWN_PROTECTION: 0
+      VIEW_DISTANCE: 16
+      GUI: FALSE
     volumes:
       - ../../../Minecraft/snublejuice:/data
     restart: "unless-stopped"
