@@ -20,13 +20,15 @@ services:
         chicken_boss10
         Bokaiii
         Cella555
-      MAX_MEMORY: 2G
-      TZ: CEST
+      MAX_MEMORY: 4G
+      TZ: "Norway/Oslo"
       DIFFICULTY: normal
-      MAX_PLAYERS: 8
+      MAX_PLAYERS: 9
       SPAWN_PROTECTION: 0
-      VIEW_DISTANCE: 16
+      VIEW_DISTANCE: 12
       GUI: FALSE
+      SNOOPER_ENABLED: FALSE
+      ENABLE_AUTOSTOP: TRUE
     volumes:
       - ../../../Minecraft/snublejuice:/data
     restart: "unless-stopped"
