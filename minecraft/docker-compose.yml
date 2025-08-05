@@ -21,14 +21,13 @@ services:
         Bokaiii
         Cella555
       MAX_MEMORY: 4G
-      TZ: "Norway/Oslo"
+      TZ: "Norway"
       DIFFICULTY: normal
       MAX_PLAYERS: 9
       SPAWN_PROTECTION: 0
       VIEW_DISTANCE: 12
       GUI: FALSE
       SNOOPER_ENABLED: FALSE
-      ENABLE_AUTOSTOP: TRUE
     volumes:
       - ../../../Minecraft/snublejuice:/data
     restart: "unless-stopped"
