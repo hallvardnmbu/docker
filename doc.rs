@@ -6,7 +6,7 @@ use std::process::Command;
 use dirs;
 use clap::{Parser, Subcommand};
 
-const CONFIG_FILE: &str = ".docconfig";
+const CONFIG_FILE: &str = ".config/doc.conf";
 
 /// Simple CLI to manage language-specific Docker Compose environments with VPN support
 #[derive(Parser)]

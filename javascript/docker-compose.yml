@@ -12,15 +12,15 @@ services:
       - OPENVPN_USER=${NORDVPN_USER}
       - OPENVPN_PASSWORD=${NORDVPN_PASSWORD}
       - SERVER_COUNTRIES=${NORDVPN_COUNTRY}
-      
+
       # Kill switch (enabled by default)
       - FIREWALL=on
       - FIREWALL_VPN_INPUT_PORTS=8080
-      
+
       # Health check
       - HEALTH_VPN_DURATION_INITIAL=30s
       - HEALTH_VPN_DURATION_ADDITION=5s
-      
+
     ports:
       # Development server ports
       - "127.0.0.1:8080:8080"

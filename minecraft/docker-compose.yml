@@ -20,7 +20,7 @@ services:
         chicken_boss10
         Bokaiii
         Cella555
-      MAX_MEMORY: 4G
+      MAX_MEMORY: 6G
       TZ: "Norway"
       DIFFICULTY: normal
       MAX_PLAYERS: 9
