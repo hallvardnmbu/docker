@@ -7,31 +7,26 @@ A simple Rust CLI tool to manage Docker Compose environments with VPN support.
 ## Quick Start
 
 1. **Build the tool:**
-   ```sh
-   cargo build --release
-   ```
 
-2. **Add your VPN credentials to `.env`:**
-   ```
-   NORDVPN_USER=your_service_username
-   NORDVPN_PASSWORD=your_service_password
-   NORDVPN_COUNTRY=Norway
-   ```
+    ```sh
+    cargo build --release
+    ```
 
-3. **Start services:**
-   ```sh
-   ./target/release/doc start <CONTAINER>
-   ```
+2. **Credentials:**
 
-   Where `<CONTAINER>` is one of:
+    Copy all `.env.example` to `.env` and fill them in.
 
-   * `snublejuice`
-   * `javascript`
-   * `torrenting`
-   * `python`
-   * `pyjs`
-   * `rust`
-   * `cpp`
+3. **Paths:**
+
+    Run `echo "/absolute/path/to/this/repository/root" >> ~/.config/doc.conf`.
+
+4. **Start services:**
+
+    ```sh
+    ./target/release/doc start <CONTAINER>
+    ```
+
+    Where `<CONTAINER>` is one of those displayed in `doc list`.
 
 ## Commands
 
