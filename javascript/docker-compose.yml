@@ -44,8 +44,8 @@ services:
       - PGID=1000
     volumes:
       # Project directories
-      - ./data:/home/data
-      - ../../snublejuice:/home/snublejuice
+      - ./data:/home/bun/data
+      - ../../snublejuice:/home/bun/snublejuice
     stdin_open: true
     tty: true
     restart: unless-stopped
