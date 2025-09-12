@@ -10,7 +10,7 @@ services:
       EULA: TRUE
       TYPE: PAPER
       VERSION: LATEST
-      MOTD: "Snublejuice"
+      MOTD: "\u00A7kiii\u00A7r \u00A72\u00A7lS N U B L E J U I C E\u00A7r \u00A7kiii"
       OVERRIDE_ICON: TRUE
       ICON: "https://raw.githubusercontent.com/hallvardnmbu/snublejuice/main/src/public/images/64x64.png"
       WHITELIST: |
@@ -21,7 +21,7 @@ services:
         Bokaiii
         Cella555
       MAX_MEMORY: 6G
-      TZ: "Norway"
+      TZ: "Europe/Oslo"
       DIFFICULTY: normal
       MAX_PLAYERS: 9
       SPAWN_PROTECTION: 0

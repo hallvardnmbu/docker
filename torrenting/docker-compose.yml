@@ -1,44 +1,32 @@
 services:
-  # VPN Container - handles all VPN connectivity
   vpn:
     image: qmcgaw/gluetun
     container_name: playground-vpn-torrenting
     cap_add:
       - NET_ADMIN
     environment:
-      # NordVPN configuration
       - VPN_SERVICE_PROVIDER=nordvpn
       - VPN_TYPE=openvpn
       - OPENVPN_USER=${NORDVPN_USER}
       - OPENVPN_PASSWORD=${NORDVPN_PASSWORD}
       - SERVER_COUNTRIES=${NORDVPN_COUNTRY}
-
-      # Kill switch (enabled by default)
       - FIREWALL=on
       - FIREWALL_VPN_INPUT_PORTS=8081,6881
-
-      # Health check
       - HEALTH_VPN_DURATION_INITIAL=30s
       - HEALTH_VPN_DURATION_ADDITION=5s
-
     ports:
-      # qBittorrent Web UI
       - "127.0.0.1:8081:8081"
-      # Torrent ports
       - "127.0.0.1:6881:6881"
       - "127.0.0.1:6881:6881/udp"
     volumes:
-      # VPN configuration (only needed if using custom configs)
       - ./vpn-config:/gluetun
     restart: unless-stopped
     networks:
       - torrenting-net
 
-  # qBittorrent - routes through VPN container
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: playground-qbittorrent
-    # Route ALL traffic through VPN container
     network_mode: "service:vpn"
     depends_on:
       - vpn
@@ -48,12 +36,9 @@ services:
       - TZ=UTC
       - WEBUI_PORT=8081
     volumes:
-      # Downloads directory
       - /mnt/storage/Media/:/downloads
-      # Config directory
       - ./data/config:/config
     restart: unless-stopped
-    # Health check via VPN container
     healthcheck:
       test:
         [
