@@ -31,7 +31,7 @@ services:
     volumes:
       # Project directories
       - ./data:/home/bun/data
-      - ../../snublejuice:/home/bun/snublejuice
+      - ../../snublecron:/home/bun/snublejuice
     stdin_open: true
     tty: true
     restart: unless-stopped
