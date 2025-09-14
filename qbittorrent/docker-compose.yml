@@ -1,7 +1,7 @@
 services:
   vpn:
     image: qmcgaw/gluetun
-    container_name: playground-vpn-torrenting
+    container_name: qbittorrent-vpn
     cap_add:
       - NET_ADMIN
     environment:
@@ -21,12 +21,10 @@ services:
     volumes:
       - ./vpn-config:/gluetun
     restart: unless-stopped
-    networks:
-      - torrenting-net
 
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
-    container_name: playground-qbittorrent
+    container_name: qbittorrent
     network_mode: "service:vpn"
     depends_on:
       - vpn
@@ -52,7 +50,3 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-networks:
-  torrenting-net:
-    driver: bridge

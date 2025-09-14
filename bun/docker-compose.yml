@@ -1,7 +1,7 @@
 services:
   vpn:
     image: qmcgaw/gluetun
-    container_name: playground-vpn-javascript
+    container_name: bun-vpn
     cap_add:
       - NET_ADMIN
     environment:
@@ -17,25 +17,18 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     restart: unless-stopped
-    networks:
-      - javascript-net
 
-  javascript:
+  bun:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: playground-javascript
+    container_name: bun
     network_mode: "service:vpn"
     depends_on:
       - vpn
     volumes:
-      # Project directories
       - ./data:/home/bun/data
       - ../../snublecron:/home/bun/snublejuice
     stdin_open: true
     tty: true
     restart: unless-stopped
-
-networks:
-  javascript-net:
-    driver: bridge
