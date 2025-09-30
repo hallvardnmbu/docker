@@ -1,0 +1,125 @@
+:root {
+    --focus: #088199;
+    --white: #eeeeee;
+    --text: #0f0f0f;
+    --transparent: #00000040;
+}
+
+html {
+    color: var(--text) !important;
+}
+
+/* Indicators. */
+.countIndicator,
+.playedIndicator {
+    box-shadow: none !important;
+    background: var(--transparent) !important;
+}
+
+/* Buttons. */
+button {
+    transition: unset !important;
+    border-radius: unset !important;
+    background: var(--transparent) !important;
+    color: var(--white) !important;
+}
+.emby-scrollbuttons-button,
+.cardOverlayButton {
+    padding: unset !important;
+}
+.skinHeader {
+    color: var(--white) !important;
+}
+.skinHeader button {
+    background: transparent !important;
+}
+.emby-tab-button,
+.emby-tab-button-active {
+    padding: 4px 8p !important;
+}
+button:hover {
+    background: transparent !important;
+    color: var(--text) !important;
+}
+.cardOverlayFab-primary:hover {
+    -webkit-transform: none !important;
+    transform: none !important;
+}
+.button-link {
+    color: var(--focus) !important;
+}
+
+/* Progress bars. */
+.itemProgressBar {
+    background: transparent !important;
+}
+.itemProgressBarForeground {
+    background-color: var(--white) !important;
+}
+
+/* Cards. */
+.cardContent {
+    border-radius: unset !important;
+    contain: inherit !important;
+}
+.cardPadder {
+    box-shadow: none !important;
+    background-color: transparent !important;
+}
+.dialog {
+    background: var(--transparent) !important;
+    border-radius: unset !important;
+    box-shadow: unset !important;
+}
+
+/* Background colours. */
+.backgroundContainer,
+.pageTabContent,
+.dialogBackdrop {
+    background-color: var(--white) !important;
+}
+.skinHeader {
+    background-color: var(--transparent) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    backdrop-filter: blur(10px) !important;
+}
+.actionsheetDivider {
+    height: 5p !important;
+    margin: unset !important;
+}
+.mainDrawer,
+.listItem:hover {
+    color: var(--white) !important;
+    background: var(--transparent) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    backdrop-filter: blur(10px) !important;
+}
+.actionSheetContent {
+    padding: unset !important;
+}
+
+/* Selection, input and detailed information page. */
+.selectLabelFocused {
+    color: var(--focus) !important;
+}
+.emby-select-withcolor {
+    background: var(--white) !important;
+}
+.emby-select-withcolor:focus {
+    border-color: var(--focus) !important;
+}
+.detailPagePrimaryContainer {
+    color: var(--white) !important;
+}
+.detailPageSecondaryContainer,
+.inputContainer input {
+    background-color: var(--white) !important;
+}
+.inputContainer label {
+    color: var(--text) M;
+}
+
+/* Logo. */
+.pageTitleWithDefaultLogo {
+    display: none !important;
+}
