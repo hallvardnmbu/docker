@@ -116,7 +116,7 @@ button:hover {
     background-color: var(--white) !important;
 }
 .inputContainer label {
-    color: var(--text) M;
+    color: var(--text);
 }
 
 /* Logo. */
