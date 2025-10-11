@@ -27,8 +27,7 @@ services:
     depends_on:
       - vpn
     volumes:
-      - ./data:/home/bun/data
-      - ../../snublecron:/home/bun/snublejuice
+      - ../../snublecron:/home/bun/snublecron
     stdin_open: true
     tty: true
     restart: unless-stopped
