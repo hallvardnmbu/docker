@@ -11,3 +11,4 @@
 auth.*
 *.ovpn
 *.txt
+!README.txt

@@ -2,7 +2,7 @@ services:
   jellyfin:
     image: jellyfin/jellyfin
     container_name: jellyfin
-    user: ${UID}:${GID}
+    user: 1000:1000
     network_mode: "host"
     volumes:
       - /mnt/storage/Jellyfin/Config:/config
@@ -10,4 +10,12 @@ services:
       - type: bind
         source: /mnt/storage/Media
         target: /media
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     restart: "unless-stopped"
