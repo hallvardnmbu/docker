@@ -115,8 +115,13 @@ button:hover {
 .inputContainer input {
     background-color: var(--white) !important;
 }
-.inputContainer label {
+.inputContainer label,
+.selectContainer select {
     color: var(--text);
+}
+.formDialogContent {
+    backdrop-filter: blur(40px);
+    color: var(--white);
 }
 
 /* Logo. */
