@@ -4,6 +4,8 @@ services:
     container_name: bun-vpn
     cap_add:
       - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
     environment:
       - VPN_SERVICE_PROVIDER=nordvpn
       - VPN_TYPE=openvpn
@@ -12,8 +14,6 @@ services:
       - SERVER_COUNTRIES=${NORDVPN_COUNTRY}
       - FIREWALL=on
       - FIREWALL_VPN_INPUT_PORTS=8080
-      - HEALTH_VPN_DURATION_INITIAL=30s
-      - HEALTH_VPN_DURATION_ADDITION=5s
     ports:
       - "127.0.0.1:8080:8080"
     restart: unless-stopped
@@ -24,10 +24,8 @@ services:
       dockerfile: Dockerfile
     container_name: bun
     network_mode: "service:vpn"
-    depends_on:
-      - vpn
     volumes:
       - ../../snublecron:/home/bun/snublecron
     stdin_open: true
     tty: true
-    restart: unless-stopped
+    restart: no
